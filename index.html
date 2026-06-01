@@ -1,17 +1,17 @@
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-#app{background:#f7f8fa;color:#111;min-height:600px;padding:28px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:24px;width:50%;min-width:360px;max-width:620px;margin:0 auto}
-h1{font-size:38px;font-weight:800;letter-spacing:2px;color:#111;margin-bottom:6px}
-.sub{color:#888;font-size:14px;letter-spacing:2px;text-transform:uppercase;margin-bottom:22px}
-.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:18px;margin-bottom:16px}
-.section-title{font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#e63000;margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:8px}
-input[type=number],input[type=text]{background:#fff;border:1px solid #ccc;border-radius:5px;color:#111;padding:8px 12px;font-size:16px;width:100%;outline:none;font-family:inherit}
+#app{background:#f7f8fa;color:#111;min-height:600px;padding:20px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:26px;width:100%;max-width:none;margin:0}
+h1{font-size:42px;font-weight:800;letter-spacing:2px;color:#111;margin-bottom:6px}
+.sub{color:#888;font-size:16px;letter-spacing:2px;text-transform:uppercase;margin-bottom:18px}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:14px}
+.section-title{font-size:14px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#e63000;margin-bottom:14px;border-bottom:1px solid #eee;padding-bottom:8px}
+input[type=number],input[type=text]{background:#fff;border:1px solid #ccc;border-radius:5px;color:#111;padding:10px 14px;font-size:20px;width:100%;outline:none;font-family:inherit}
 input[type=number]:focus,input[type=text]:focus{border-color:#e63000;box-shadow:0 0 0 2px #e6300022}
 input:disabled{background:#f5f5f5;color:#bbb}
-button{background:#e63000;color:#fff;border:none;border-radius:5px;padding:12px 24px;font-size:16px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-family:inherit}
+button{background:#e63000;color:#fff;border:none;border-radius:5px;padding:14px 24px;font-size:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-family:inherit}
 button:hover{background:#ff4d1c}
-button.ghost{background:transparent;border:1px solid #e0e0e0;color:#888;font-size:13px;padding:6px 14px}
+button.ghost{background:transparent;border:1px solid #e0e0e0;color:#888;font-size:15px;padding:8px 16px}
 button.ghost:hover{border-color:#e63000;color:#e63000}
 button.confirm-btn{background:#e63000;color:#fff;border:none;border-radius:5px;padding:7px 18px;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:inherit;margin-top:8px;width:100%}
 button.confirm-btn:hover{background:#ff4d1c}
@@ -24,8 +24,8 @@ button.confirm-btn:hover{background:#ff4d1c}
 .tab.active{color:#e63000;border-bottom:2px solid #e63000}
 .badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:1px}
 .badge.live{background:#fff0ec;color:#e63000;border:1px solid #e63000}
-table{width:100%;min-width:0;border-collapse:collapse;font-size:16px}
-th{background:#f7f8fa;color:#555;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:9px 10px;text-align:center;border:1px solid #e8e8e8}
+table{width:100%;min-width:0;border-collapse:collapse;font-size:18px}
+th{background:#f7f8fa;color:#555;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:10px 12px;text-align:center;border:1px solid #e8e8e8}
 td{padding:6px 8px;text-align:center;border:1px solid #eee;color:#111}
 .rank1 td:first-child{color:#b08800;font-weight:800}
 .rank2 td:first-child{color:#666;font-weight:700}
@@ -47,15 +47,15 @@ td{padding:6px 8px;text-align:center;border:1px solid #eee;color:#111}
 .grid-tables{display:grid;gap:14px;width:100%;grid-template-columns:1fr}
 .alert{background:#fff0ec;border:1px solid #e63000;border-radius:5px;padding:14px;color:#e63000;font-size:14px;margin-bottom:14px}
 @media (max-width:640px){
-  #app{width:100%;padding:16px;min-height:auto;font-size:22px}
+  #app{width:100%;padding:16px;min-height:auto;font-size:24px}
   .card{padding:16px}
   .tab-bar{flex-wrap:wrap;justify-content:center}
-  .tab{padding:12px 14px;font-size:15px}
+  .tab{padding:14px 16px;font-size:16px}
   .player-row{flex-wrap:wrap}
   .player-row input{min-width:100%}
   .match-card{padding:16px}
   .score-row{grid-template-columns:1fr 44px 10px 44px 1fr}
-  .score-row input{text-align:center;padding:8px 3px;font-size:16px}
+  .score-row input{text-align:center;padding:10px 4px;font-size:18px}
   .history-item{flex-direction:column;align-items:flex-start}
 }
 .history-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;gap:8px;flex-wrap:wrap}
