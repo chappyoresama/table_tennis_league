@@ -1,7 +1,7 @@
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-#app{background:#f7f8fa;color:#111;min-height:600px;padding:20px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px}
+#app{background:#f7f8fa;color:#111;min-height:600px;padding:20px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px;width:100%;max-width:1200px;margin:0 auto}
 h1{font-size:24px;font-weight:800;letter-spacing:2px;color:#111;margin-bottom:2px}
 .sub{color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
 .card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:14px}
@@ -24,7 +24,7 @@ button.confirm-btn:hover{background:#ff4d1c}
 .tab.active{color:#e63000;border-bottom:2px solid #e63000}
 .badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px}
 .badge.live{background:#fff0ec;color:#e63000;border:1px solid #e63000}
-table{width:100%;border-collapse:collapse;font-size:12px}
+table{width:100%;min-width:0;border-collapse:collapse;font-size:12px}
 th{background:#f7f8fa;color:#555;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 8px;text-align:center;border:1px solid #e8e8e8}
 td{padding:6px 8px;text-align:center;border:1px solid #eee;color:#111}
 .rank1 td:first-child{color:#b08800;font-weight:800}
@@ -44,7 +44,7 @@ td{padding:6px 8px;text-align:center;border:1px solid #eee;color:#111}
 .total-score{font-size:22px;font-weight:800;color:#111}
 .winner-badge{background:#fffbe6;color:#b08800;border:1px solid #ffd700;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px}
 .table-label{display:inline-block;background:#f0f0f0;color:#666;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;letter-spacing:1px;margin-right:4px}
-.grid-tables{display:grid;gap:10px}
+.grid-tables{display:grid;gap:10px;width:100%;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 .alert{background:#fff0ec;border:1px solid #e63000;border-radius:5px;padding:10px;color:#e63000;font-size:12px;margin-bottom:12px}
 .history-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;gap:8px;flex-wrap:wrap}
 .history-sets{font-size:11px;color:#888;margin-top:3px;line-height:1.6}
@@ -139,11 +139,16 @@ function fillTables(){
 
 function startLeague(){
   S.players=S.players.filter(x=>x.trim());
+  if(S.players.length<2){
+    alert('選手を2名以上入力してください');
+    return;
+  }
   S.allPairs=buildAllPairs(S.players);
   S.pendingPairs=[...S.allPairs];
   S.activeMatches=[];S.activeSets={};S.history=[];
   S.phase='league';S.view='matches';
   fillTables();
+  render();
 }
 
 function confirmMatch(mid){
@@ -237,18 +242,17 @@ ${S.players.filter(x=>x.trim()).length>=2
 }
 
 function renderMain(){
-  const tabs=`<div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div>`;
-  if(S.view==='history')return tabs+renderHistory();
-  if(S.view==='league')return tabs+renderLeagueView();
-  return tabs+renderMatches();
+  const header=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><button class="ghost" id="backToSetup">設定画面に戻る</button></div>`;
+  if(S.view==='history')return header+renderHistory();
+  if(S.view==='league')return header+renderLeagueView();
+  return header+renderMatches();
 }
 
 function renderMatches(){
   const total=S.allPairs.length;
   const done=S.history.length;
   let html=`<div style="color:#888;font-size:12px;margin-bottom:10px">進行中: ${S.activeMatches.length}試合 ／ 完了: ${done} ／ 全 ${total} 試合</div>`;
-  const cols=Math.max(1,Math.min(S.tables,S.activeMatches.length||1));
-  html+=`<div class="grid-tables" style="grid-template-columns:repeat(${cols},1fr)">`;
+  html+=`<div class="grid-tables">`;
   for(let ti=0;ti<S.tables;ti++){
     const m=S.activeMatches.find(x=>x.tableIdx===ti);
     if(!m){
@@ -380,6 +384,8 @@ function attachEvents(){
   if(ap)ap.onclick=()=>{S.players.push('');render();};
   const sl=document.getElementById('startLeague');
   if(sl)sl.onclick=()=>startLeague();
+  const back=document.getElementById('backToSetup');
+  if(back)back.onclick=()=>{S.phase='setup';S.view='matches';render();};
   document.querySelectorAll('input[data-mid]').forEach(inp=>{
     inp.oninput=()=>{
       const mid=inp.dataset.mid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
