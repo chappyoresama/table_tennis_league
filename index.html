@@ -1,0 +1,403 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+#app{background:#f7f8fa;color:#111;min-height:600px;padding:20px;font-family:'Helvetica Neue',Arial,sans-serif;font-size:14px}
+h1{font-size:24px;font-weight:800;letter-spacing:2px;color:#111;margin-bottom:2px}
+.sub{color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px}
+.card{background:#fff;border:1px solid #e0e0e0;border-radius:10px;padding:16px;margin-bottom:14px}
+.section-title{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#e63000;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:6px}
+input[type=number],input[type=text]{background:#fff;border:1px solid #ccc;border-radius:5px;color:#111;padding:6px 10px;font-size:13px;width:100%;outline:none;font-family:inherit}
+input[type=number]:focus,input[type=text]:focus{border-color:#e63000;box-shadow:0 0 0 2px #e6300022}
+input:disabled{background:#f5f5f5;color:#bbb}
+button{background:#e63000;color:#fff;border:none;border-radius:5px;padding:8px 20px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;font-family:inherit}
+button:hover{background:#ff4d1c}
+button.ghost{background:transparent;border:1px solid #e0e0e0;color:#888;font-size:11px;padding:5px 12px}
+button.ghost:hover{border-color:#e63000;color:#e63000}
+button.confirm-btn{background:#e63000;color:#fff;border:none;border-radius:5px;padding:7px 18px;font-size:12px;font-weight:700;letter-spacing:1px;cursor:pointer;font-family:inherit;margin-top:8px;width:100%}
+button.confirm-btn:hover{background:#ff4d1c}
+.player-row{display:flex;gap:8px;align-items:center;margin-bottom:6px}
+.player-row input{flex:1}
+.player-row .rm{background:transparent;border:none;color:#bbb;cursor:pointer;font-size:15px;padding:2px 6px;font-family:inherit}
+.player-row .rm:hover{color:#e63000}
+.tab-bar{display:flex;gap:4px;margin-bottom:14px;border-bottom:2px solid #eee;padding-bottom:0}
+.tab{padding:8px 18px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#999;border-bottom:2px solid transparent;margin-bottom:-2px}
+.tab.active{color:#e63000;border-bottom:2px solid #e63000}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:1px}
+.badge.live{background:#fff0ec;color:#e63000;border:1px solid #e63000}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:#f7f8fa;color:#555;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:7px 8px;text-align:center;border:1px solid #e8e8e8}
+td{padding:6px 8px;text-align:center;border:1px solid #eee;color:#111}
+.rank1 td:first-child{color:#b08800;font-weight:800}
+.rank2 td:first-child{color:#666;font-weight:700}
+.rank3 td:first-child{color:#a0522d;font-weight:700}
+.match-card{border:1px solid #e0e0e0;border-radius:10px;padding:14px;margin-bottom:10px;background:#fff}
+.match-card.active{border-color:#e63000;border-width:2px}
+.match-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.players-line{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:700;flex-wrap:wrap}
+.vs{color:#bbb;font-size:11px;font-weight:400}
+.score-row{display:grid;grid-template-columns:1fr 44px 10px 44px 1fr;gap:4px;align-items:center;margin-bottom:4px}
+.score-row .lbl{font-size:10px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.score-row .lbl.r{text-align:right}
+.score-row .sep{color:#ccc;text-align:center;font-size:12px}
+.score-row input{text-align:center;padding:5px 2px;font-size:13px;font-weight:600}
+.total-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:8px 0 4px}
+.total-score{font-size:22px;font-weight:800;color:#111}
+.winner-badge{background:#fffbe6;color:#b08800;border:1px solid #ffd700;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px}
+.table-label{display:inline-block;background:#f0f0f0;color:#666;border-radius:3px;padding:1px 7px;font-size:10px;font-weight:700;letter-spacing:1px;margin-right:4px}
+.grid-tables{display:grid;gap:10px}
+.alert{background:#fff0ec;border:1px solid #e63000;border-radius:5px;padding:10px;color:#e63000;font-size:12px;margin-bottom:12px}
+.history-item{display:flex;align-items:flex-start;justify-content:space-between;padding:10px 0;border-bottom:1px solid #eee;gap:8px;flex-wrap:wrap}
+.history-sets{font-size:11px;color:#888;margin-top:3px;line-height:1.6}
+.empty-slot{border:2px dashed #e0e0e0;border-radius:10px;padding:20px;text-align:center;color:#ccc;font-size:12px}
+.remaining-info{background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:8px 12px;font-size:11px;color:#888;margin-top:8px}
+</style>
+<div id="app">
+<h1>🏓 卓球リーグ</h1>
+<div class="sub">Table Tennis League Manager</div>
+<div id="root"></div>
+</div>
+<script>
+const S={
+  phase:'setup',
+  tables:2,
+  players:['',''],
+  allPairs:[],
+  pendingPairs:[],
+  activeMatches:[],
+  activeSets:{},
+  history:[],
+  view:'matches',
+  tableCount:0
+};
+
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
+
+function buildAllPairs(players){
+  const pairs=[];
+  for(let i=0;i<players.length;i++)
+    for(let j=i+1;j<players.length;j++)
+      pairs.push({p1:players[i],p2:players[j]});
+  return shuffle(pairs);
+}
+
+function emptySetsList(){return Array(5).fill(null).map(()=>[null,null]);}
+
+function calcSets(sets){
+  let w1=0,w2=0;
+  for(const[a,b]of sets){if(a===null||b===null)continue;if(a>b)w1++;else if(b>a)w2++;}
+  return{w1,w2};
+}
+
+function busyPlayers(){
+  const s=new Set();
+  for(const m of S.activeMatches){s.add(m.p1);s.add(m.p2);}
+  return s;
+}
+
+function recentlyPlayed(){
+  const rp={};
+  for(let i=S.history.length-1;i>=0;i--){
+    const h=S.history[i];
+    if(!rp[h.p1])rp[h.p1]=S.history.length-i;
+    if(!rp[h.p2])rp[h.p2]=S.history.length-i;
+    if(Object.keys(rp).length===S.players.length)break;
+  }
+  return rp;
+}
+
+function assignNewMatch(tableIdx){
+  const busy=busyPlayers();
+  const rp=recentlyPlayed();
+  let best=null,bestScore=-Infinity;
+  for(let i=0;i<S.pendingPairs.length;i++){
+    const{p1,p2}=S.pendingPairs[i];
+    if(busy.has(p1)||busy.has(p2))continue;
+    const score=(rp[p1]||0)+(rp[p2]||0);
+    if(score>bestScore){bestScore=score;best=i;}
+  }
+  if(best===null)return false;
+  const pair=S.pendingPairs.splice(best,1)[0];
+  const id=`${pair.p1}__${pair.p2}__${Date.now()}__${tableIdx}`;
+  S.activeMatches.push({...pair,id,tableIdx});
+  S.activeSets[id]=emptySetsList();
+  return true;
+}
+
+function fillTables(){
+  let added=true;
+  while(added){
+    added=false;
+    const freeTables=[];
+    const usedTables=new Set(S.activeMatches.map(m=>m.tableIdx));
+    for(let i=0;i<S.tables;i++)if(!usedTables.has(i))freeTables.push(i);
+    if(freeTables.length===0)break;
+    for(const ti of freeTables){
+      if(assignNewMatch(ti))added=true;
+    }
+  }
+}
+
+function startLeague(){
+  S.players=S.players.filter(x=>x.trim());
+  S.allPairs=buildAllPairs(S.players);
+  S.pendingPairs=[...S.allPairs];
+  S.activeMatches=[];S.activeSets={};S.history=[];
+  S.phase='league';S.view='matches';
+  fillTables();
+}
+
+function confirmMatch(mid){
+  const m=S.activeMatches.find(x=>x.id===mid);
+  if(!m)return;
+  const sets=S.activeSets[mid]||emptySetsList();
+  const r=calcSets(sets);
+  if(r.w1<3&&r.w2<3){alert('先に3セット取る必要があります');return;}
+  const ti=m.tableIdx;
+  S.history.push({p1:m.p1,p2:m.p2,sets:sets.map(s=>[...s]),tableLabel:`台${ti+1}`,ts:Date.now()});
+  S.activeMatches=S.activeMatches.filter(x=>x.id!==mid);
+  delete S.activeSets[mid];
+  fillTables();
+  render();
+}
+
+function getLeague(){
+  const ps=S.players.filter(x=>x);
+  const stats={};
+  for(const p of ps)stats[p]={w:0,l:0,sw:0,sl:0};
+  for(const h of S.history){
+    const r=calcSets(h.sets);
+    const w=r.w1>r.w2?h.p1:h.p2,l=r.w1>r.w2?h.p2:h.p1;
+    stats[w].w++;stats[l].l++;
+    stats[h.p1].sw+=r.w1;stats[h.p1].sl+=r.w2;
+    stats[h.p2].sw+=r.w2;stats[h.p2].sl+=r.w1;
+  }
+  let ranked=Object.entries(stats).map(([p,s])=>({p,...s}));
+  ranked.sort((a,b)=>{
+    if(b.w!==a.w)return b.w-a.w;
+    const dh=S.history.find(h=>(h.p1===a.p&&h.p2===b.p)||(h.p1===b.p&&h.p2===a.p));
+    if(dh){
+      const r=calcSets(dh.sets);
+      const aw=dh.p1===a.p?r.w1:r.w2,bw=dh.p1===b.p?r.w1:r.w2;
+      if(aw!==bw)return bw-aw;
+    }
+    const aRatio=a.sl===0?(a.sw>0?999:0):a.sw/a.sl;
+    const bRatio=b.sl===0?(b.sw>0?999:0):b.sw/b.sl;
+    return bRatio-aRatio;
+  });
+  // Handle three-way ties
+  for(let i=0;i<ranked.length;){
+    let j=i;
+    while(j<ranked.length&&ranked[j].w===ranked[i].w)j++;
+    if(j-i>=3){
+      const group=ranked.slice(i,j);
+      const tiePs=group.map(x=>x.p);
+      const subStats={};
+      for(const p of tiePs)subStats[p]={sw:0,sl:0};
+      for(const h of S.history){
+        if(tiePs.includes(h.p1)&&tiePs.includes(h.p2)){
+          const r=calcSets(h.sets);
+          subStats[h.p1].sw+=r.w1;subStats[h.p1].sl+=r.w2;
+          subStats[h.p2].sw+=r.w2;subStats[h.p2].sl+=r.w1;
+        }
+      }
+      group.sort((a,b)=>{
+        const aR=subStats[a.p].sl===0?(subStats[a.p].sw>0?999:0):subStats[a.p].sw/subStats[a.p].sl;
+        const bR=subStats[b.p].sl===0?(subStats[b.p].sw>0?999:0):subStats[b.p].sw/subStats[b.p].sl;
+        return bR-aR;
+      });
+      for(let k=0;k<group.length;k++)ranked[i+k]=group[k];
+    }
+    i=j;
+  }
+  return ranked;
+}
+
+function render(){
+  const root=document.getElementById('root');
+  root.innerHTML=S.phase==='setup'?renderSetup():renderMain();
+  attachEvents();
+}
+
+function renderSetup(){
+  return`<div class="card">
+  <div class="section-title">基本設定</div>
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
+    <label style="color:#555;font-size:12px;white-space:nowrap">台の数</label>
+    <input type="number" id="tableCount" value="${S.tables}" min="1" max="10" style="width:70px">
+  </div>
+</div>
+<div class="card">
+  <div class="section-title">参加者</div>
+  <div id="playerList">${S.players.map((p,i)=>`<div class="player-row"><input type="text" data-pi="${i}" value="${p}" placeholder="選手名 ${i+1}"><button class="rm" data-rm="${i}">✕</button></div>`).join('')}</div>
+  <button class="ghost" id="addPlayer" style="margin-top:8px">＋ 選手を追加</button>
+</div>
+${S.players.filter(x=>x.trim()).length>=2
+  ?`<div style="text-align:center;margin-top:16px"><button id="startLeague" style="padding:12px 36px;font-size:14px;letter-spacing:2px">▶ 試合開始</button></div>`
+  :`<div class="alert">選手を2名以上入力してください</div>`}`;
+}
+
+function renderMain(){
+  const tabs=`<div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div>`;
+  if(S.view==='history')return tabs+renderHistory();
+  if(S.view==='league')return tabs+renderLeagueView();
+  return tabs+renderMatches();
+}
+
+function renderMatches(){
+  const total=S.allPairs.length;
+  const done=S.history.length;
+  let html=`<div style="color:#888;font-size:12px;margin-bottom:10px">進行中: ${S.activeMatches.length}試合 ／ 完了: ${done} ／ 全 ${total} 試合</div>`;
+  const cols=Math.max(1,Math.min(S.tables,S.activeMatches.length||1));
+  html+=`<div class="grid-tables" style="grid-template-columns:repeat(${cols},1fr)">`;
+  for(let ti=0;ti<S.tables;ti++){
+    const m=S.activeMatches.find(x=>x.tableIdx===ti);
+    if(!m){
+      const noPending=S.pendingPairs.length===0&&S.activeMatches.length===0;
+      html+=noPending?'':`<div class="empty-slot">台${ti+1}<br>待機中</div>`;
+      continue;
+    }
+    const sets=S.activeSets[m.id]||emptySetsList();
+    const{w1,w2}=calcSets(sets);
+    const finished=w1>=3||w2>=3;
+    html+=`<div class="match-card active" data-card="${m.id}">
+      <div class="match-header">
+        <span class="table-label">台${ti+1}</span>
+        <span class="badge live">● LIVE</span>
+      </div>
+      <div class="players-line">${m.p1} <span class="vs">vs</span> ${m.p2}</div>
+      <div style="margin-top:10px">
+        ${Array(5).fill(0).map((_,i)=>{
+          const[a,b]=sets[i]||[null,null];
+          const prevW1=calcSets(sets.slice(0,i)).w1,prevW2=calcSets(sets.slice(0,i)).w2;
+          const dis=(prevW1>=3||prevW2>=3)||((w1>=3||w2>=3)&&a===null&&b===null);
+          return`<div class="score-row">
+            <span class="lbl r">第${i+1}セット</span>
+            <input type="number" data-mid="${m.id}" data-set="${i}" data-side="0" value="${a!==null?a:''}" min="0" max="40" placeholder="-" ${dis?'disabled':''}>
+            <span class="sep">-</span>
+            <input type="number" data-mid="${m.id}" data-set="${i}" data-side="1" value="${b!==null?b:''}" min="0" max="40" placeholder="-" ${dis?'disabled':''}>
+            <span class="lbl"></span>
+          </div>`;
+        }).join('')}
+      </div>
+      ${(w1>0||w2>0)?`<div class="total-row"><span class="total-score">${w1} - ${w2}</span>${finished?`<span class="winner-badge">${w1>w2?m.p1:m.p2} 勝利！</span>`:''}</div>`:''}
+      ${finished?`<button class="confirm-btn" data-confirm="${m.id}">✔ 確定</button>`:''}
+    </div>`;
+  }
+  html+=`</div>`;
+  if(S.pendingPairs.length>0){
+    const busy=busyPlayers();
+    const next=S.pendingPairs.filter(p=>!busy.has(p.p1)&&!busy.has(p.p2));
+    if(next.length>0)html+=`<div class="remaining-info">待機中の対戦: ${next.slice(0,3).map(p=>`${p.p1} vs ${p.p2}`).join(' / ')}${next.length>3?' など':''}（残り ${S.pendingPairs.length} 試合）</div>`;
+    else html+=`<div class="remaining-info">残り ${S.pendingPairs.length} 試合（現在試合中の選手待ち）</div>`;
+  }
+  if(S.pendingPairs.length===0&&S.activeMatches.length===0){
+    html+=`<div class="card" style="text-align:center;padding:24px"><div style="font-size:18px;font-weight:800;color:#e63000;margin-bottom:6px">🏆 全試合終了！</div><div style="color:#888;font-size:12px">リーグ表タブで最終結果をご確認ください</div></div>`;
+  }
+  return html;
+}
+
+function renderHistory(){
+  if(!S.history.length)return`<div class="card"><div style="color:#888;text-align:center;padding:20px">まだ試合結果がありません</div></div>`;
+  let html=`<div class="card"><div class="section-title">全試合結果</div>`;
+  for(let i=S.history.length-1;i>=0;i--){
+    const h=S.history[i];const r=calcSets(h.sets);
+    const winner=r.w1>r.w2?h.p1:h.p2;
+    const setsStr=h.sets.filter(([a,b])=>a!==null&&b!==null).map(([a,b])=>`${a}-${b}`).join('、');
+    html+=`<div class="history-item">
+      <div>
+        <div style="font-weight:700">${h.p1} <span style="color:#e63000">${r.w1}-${r.w2}</span> ${h.p2}</div>
+        <div class="history-sets">各セット: ${setsStr}</div>
+        <div style="margin-top:2px"><span class="table-label">${h.tableLabel}</span></div>
+      </div>
+      <span class="winner-badge">${winner}</span>
+    </div>`;
+  }
+  return html+`</div>`;
+}
+
+function renderLeagueView(){
+  const ps=S.players.filter(x=>x);
+  const league=getLeague();
+  let html=`<div class="card"><div class="section-title">対戦マトリクス</div><div style="overflow-x:auto"><table><tr><th></th>`;
+  for(const p of ps)html+=`<th>${p}</th>`;
+  html+=`</tr>`;
+  for(const p1 of ps){
+    html+=`<tr><td style="font-weight:700;text-align:left;background:#f7f8fa;white-space:nowrap">${p1}</td>`;
+    for(const p2 of ps){
+      if(p1===p2){html+=`<td style="background:#f7f8fa">―</td>`;continue;}
+      const h=S.history.find(h=>(h.p1===p1&&h.p2===p2)||(h.p1===p2&&h.p2===p1));
+      if(!h){html+=`<td style="color:#ddd">未</td>`;continue;}
+      const r=calcSets(h.sets);const[my,op]=h.p1===p1?[r.w1,r.w2]:[r.w2,r.w1];
+      html+=`<td style="font-weight:700;color:${my>op?'#2a8a2a':'#cc2200'}">${my}-${op}</td>`;
+    }
+    html+=`</tr>`;
+  }
+  html+=`</table></div></div>`;
+  html+=`<div class="card"><div class="section-title">順位表</div><table><tr><th>#</th><th style="text-align:left">選手</th><th>試合</th><th>勝</th><th>負</th><th>セット</th></tr>`;
+  league.forEach((r,i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':''
+    const cls=i===0?'rank1':i===1?'rank2':i===2?'rank3':'';
+    html+=`<tr class="${cls}"><td>${medal||i+1}</td><td style="text-align:left;font-weight:600">${r.p}</td><td style="color:#888">${r.w+r.l}</td><td style="color:#2a8a2a;font-weight:700">${r.w}</td><td style="color:#cc2200">${r.l}</td><td>${r.sw}-${r.sl}</td></tr>`;
+  });
+  return html+`</table></div>`;
+}
+
+function updateMatchCard(mid){
+  const card=document.querySelector(`[data-card="${mid}"]`);
+  if(!card)return;
+  const m=S.activeMatches.find(x=>x.id===mid);
+  if(!m)return;
+  const sets=S.activeSets[mid]||emptySetsList();
+  const{w1,w2}=calcSets(sets);
+  const finished=w1>=3||w2>=3;
+  let totalRow=card.querySelector('.total-row');
+  if(w1>0||w2>0){
+    const html=`<span class="total-score">${w1} - ${w2}</span>${finished?`<span class="winner-badge">${w1>w2?m.p1:m.p2} 勝利！</span>`:''}`;
+    if(totalRow){totalRow.innerHTML=html;}
+    else{totalRow=document.createElement('div');totalRow.className='total-row';totalRow.innerHTML=html;card.appendChild(totalRow);}
+  }
+  let cb=card.querySelector('.confirm-btn');
+  if(finished){
+    if(!cb){cb=document.createElement('button');cb.className='confirm-btn';cb.dataset.confirm=mid;cb.textContent='✔ 確定';cb.addEventListener('click',()=>confirmMatch(mid));card.appendChild(cb);}
+  } else {if(cb)cb.remove();}
+  card.querySelectorAll('input[data-mid]').forEach(inp=>{
+    const si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
+    const[a,b]=sets[si]||[null,null];
+    const prevW1=calcSets(sets.slice(0,si)).w1,prevW2=calcSets(sets.slice(0,si)).w2;
+    const dis=(prevW1>=3||prevW2>=3)||((w1>=3||w2>=3)&&a===null&&b===null);
+    if(document.activeElement!==inp){inp.value=(side===0?a:b)!==null?(side===0?a:b):'';}
+    inp.disabled=dis;
+  });
+}
+
+function attachEvents(){
+  document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>{S.view=el.dataset.tab;render();};});
+  const tc=document.getElementById('tableCount');
+  if(tc)tc.onchange=()=>{S.tables=Math.max(1,parseInt(tc.value)||1);};
+  document.querySelectorAll('[data-pi]').forEach(inp=>{inp.oninput=()=>{S.players[parseInt(inp.dataset.pi)]=inp.value;};});
+  document.querySelectorAll('[data-rm]').forEach(btn=>{btn.onclick=()=>{const i=parseInt(btn.dataset.rm);S.players.splice(i,1);if(!S.players.length)S.players=[''];render();};});
+  const ap=document.getElementById('addPlayer');
+  if(ap)ap.onclick=()=>{S.players.push('');render();};
+  const sl=document.getElementById('startLeague');
+  if(sl)sl.onclick=()=>startLeague();
+  document.querySelectorAll('input[data-mid]').forEach(inp=>{
+    inp.oninput=()=>{
+      const mid=inp.dataset.mid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
+      if(!S.activeSets[mid])S.activeSets[mid]=emptySetsList();
+      const raw=inp.value;
+      if(raw===''){S.activeSets[mid][si][side]=null;updateMatchCard(mid);return;}
+      const v=parseInt(raw);if(isNaN(v))return;
+      S.activeSets[mid][si][side]=v;
+      const other=1-side;
+      if(v<=9)S.activeSets[mid][si][other]=11;
+      else S.activeSets[mid][si][other]=v+2;
+      updateMatchCard(mid);
+    };
+  });
+  document.querySelectorAll('[data-confirm]').forEach(btn=>{
+    btn.onclick=()=>confirmMatch(btn.dataset.confirm);
+  });
+}
+
+render();
+</script>
