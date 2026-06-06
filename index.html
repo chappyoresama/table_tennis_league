@@ -95,7 +95,7 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 <div id="app">
 <div class="creator-credit">
   <span>作成者</span>
-  <a class="creator-link" href="https://x.com/ttnktk" target="_blank" rel="noopener noreferrer" aria-label="X(旧: Twitter) @ttnktk">
+  <a class="creator-link" href="author.html" aria-label="作成者ページへ">
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <path d="M18.9 2h3.3l-7.3 8.3 8.6 11.7h-6.8l-5.3-7-6 7H2.1l7.8-9L1.7 2h7l4.8 6.4L18.9 2Zm-1.2 18h1.8L7.7 3.9h-2L17.7 20Z"/>
     </svg>
@@ -110,6 +110,7 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 const S={
   phase:'setup',
   tables:2,
+  setsCount:5,
   players:['',''],
   allPairs:[],
   pendingPairs:[],
@@ -117,7 +118,10 @@ const S={
   activeSets:{},
   history:[],
   view:'matches',
-  tableCount:0
+  tableCount:0,
+  editingHistory:{},
+  editingSets:{},
+  exportVisible:false
 };
 
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
@@ -130,7 +134,8 @@ function buildAllPairs(players){
   return shuffle(pairs);
 }
 
-function emptySetsList(){return Array(5).fill(null).map(()=>[null,null]);}
+function getWinCount(){return Math.ceil(S.setsCount/2);}
+function emptySetsList(count=S.setsCount){return Array(count).fill(null).map(()=>[null,null]);}
 
 function calcSets(sets){
   let w1=0,w2=0;
@@ -206,9 +211,10 @@ function confirmMatch(mid){
   if(!m)return;
   const sets=S.activeSets[mid]||emptySetsList();
   const r=calcSets(sets);
-  if(r.w1<3&&r.w2<3){alert('先に3セット取る必要があります');return;}
+  const winCount=getWinCount();
+  if(r.w1<winCount&&r.w2<winCount){alert('先に'+winCount+'セット取る必要があります');return;}
   const ti=m.tableIdx;
-  S.history.push({p1:m.p1,p2:m.p2,sets:sets.map(s=>[...s]),tableLabel:`台${ti+1}`,ts:Date.now()});
+  S.history.push({id:mid,p1:m.p1,p2:m.p2,sets:sets.map(s=>[...s]),tableLabel:`台${ti+1}`,ts:Date.now()});
   S.activeMatches=S.activeMatches.filter(x=>x.id!==mid);
   delete S.activeSets[mid];
   fillTables();
@@ -267,6 +273,45 @@ function getLeague(){
   return ranked;
 }
 
+function startEditHistory(id){
+  const h=S.history.find(x=>x.id===id);
+  if(!h)return;
+  S.editingHistory[id]=true;
+  S.editingSets[id]=h.sets.map(s=>[s[0],s[1]]);
+}
+
+function cancelEditHistory(id){
+  delete S.editingHistory[id];
+  delete S.editingSets[id];
+}
+
+function saveHistoryEdit(id){
+  const h=S.history.find(x=>x.id===id);
+  if(!h)return;
+  const sets=S.editingSets[id]||h.sets;
+  const normalized=sets.map(([a,b])=>[a===null||a===' '||a===''?null:parseInt(a,10),b===null||b===' '||b===''?null:parseInt(b,10)]);
+  for(const row of normalized){
+    if(row[0]!==null&&isNaN(row[0]))row[0]=null;
+    if(row[1]!==null&&isNaN(row[1]))row[1]=null;
+  }
+  const r=calcSets(normalized);
+  const winCount=getWinCount();
+  if(r.w1<winCount&&r.w2<winCount){alert('先に'+winCount+'セット取る必要があります');return;}
+  if(r.w1===r.w2){alert('勝敗が決まるように点数を入力してください');return;}
+  h.sets=normalized;
+  delete S.editingHistory[id];
+  delete S.editingSets[id];
+}
+
+function buildExportText(){
+  if(!S.history.length)return '試合結果がありません';
+  return S.history.map(h=>{
+    const r=calcSets(h.sets);
+    const sets=h.sets.filter(([a,b])=>a!==null&&b!==null).map(([a,b])=>`${a}-${b}`).join(', ');
+    return `${h.tableLabel} ${h.p1} vs ${h.p2} ${r.w1}-${r.w2} (${sets})`;
+  }).join('\r\n');
+}
+
 function render(){
   const root=document.getElementById('root');
   root.innerHTML=S.phase==='setup'?renderSetup():renderMain();
@@ -276,9 +321,13 @@ function render(){
 function renderSetup(){
   return`<div class="card">
   <div class="section-title">基本設定</div>
-  <div style="display:flex;align-items:center;gap:24px;margin-bottom:4px">
+  <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
     <label style="color:#555;font-size:24px;white-space:nowrap">台の数</label>
     <input type="number" id="tableCount" value="${S.tables}" min="1" max="10" style="width:100px">
+  </div>
+  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:16px;margin-bottom:4px">
+    <label style="display:flex;align-items:center;gap:10px;font-size:22px"><input type="radio" name="setCount" value="3" ${S.setsCount===3?'checked':''}> 3セット (2勝)</label>
+    <label style="display:flex;align-items:center;gap:10px;font-size:22px"><input type="radio" name="setCount" value="5" ${S.setsCount===5?'checked':''}> 5セット (3勝)</label>
   </div>
 </div>
 <div class="card">
@@ -300,6 +349,8 @@ function renderMain(){
 function renderMatches(){
   const total=S.allPairs.length;
   const done=S.history.length;
+  const winCount=getWinCount();
+  const setsCount=S.setsCount;
   let html=`<div style="color:#888;font-size:12px;margin-bottom:10px">進行中: ${S.activeMatches.length}試合 ／ 完了: ${done} ／ 全 ${total} 試合</div>`;
   html+=`<div class="grid-tables">`;
   for(let ti=0;ti<S.tables;ti++){
@@ -311,7 +362,7 @@ function renderMatches(){
     }
     const sets=S.activeSets[m.id]||emptySetsList();
     const{w1,w2}=calcSets(sets);
-    const finished=w1>=3||w2>=3;
+    const finished=w1>=winCount||w2>=winCount;
     html+=`<div class="match-card active" data-card="${m.id}">
       <div class="match-header">
         <span class="table-label">台${ti+1}</span>
@@ -319,10 +370,10 @@ function renderMatches(){
       </div>
       <div class="players-line">${m.p1} <span class="vs">vs</span> ${m.p2}</div>
       <div style="margin-top:10px">
-        ${Array(5).fill(0).map((_,i)=>{
+        ${Array(setsCount).fill(0).map((_,i)=>{
           const[a,b]=sets[i]||[null,null];
           const prevW1=calcSets(sets.slice(0,i)).w1,prevW2=calcSets(sets.slice(0,i)).w2;
-          const dis=(prevW1>=3||prevW2>=3)||((w1>=3||w2>=3)&&a===null&&b===null);
+          const dis=(prevW1>=winCount||prevW2>=winCount)||((w1>=winCount||w2>=winCount)&&a===null&&b===null);
           return`<div class="score-row">
             <span class="lbl r">第${i+1}セット</span>
             <input type="number" data-mid="${m.id}" data-set="${i}" data-side="0" value="${a!==null?a:''}" min="0" max="40" placeholder="-" ${dis?'disabled':''}>
@@ -353,16 +404,29 @@ function renderHistory(){
   if(!S.history.length)return`<div class="card"><div style="color:#888;text-align:center;padding:20px">まだ試合結果がありません</div></div>`;
   let html=`<div class="card"><div class="section-title">全試合結果</div>`;
   for(let i=S.history.length-1;i>=0;i--){
-    const h=S.history[i];const r=calcSets(h.sets);
-    const winner=r.w1>r.w2?h.p1:h.p2;
+    const h=S.history[i];
+    const r=calcSets(h.sets);
+    const winCount=getWinCount();
+    const finished=r.w1>=winCount||r.w2>=winCount;
+    const winner=finished? (r.w1>r.w2?h.p1:h.p2):'未確定';
+    const inEdit=!!S.editingHistory[h.id];
+    const editSets=S.editingSets[h.id] || h.sets;
     const setsStr=h.sets.filter(([a,b])=>a!==null&&b!==null).map(([a,b])=>`${a}-${b}`).join('、');
-    html+=`<div class="history-item">
-      <div>
+    const setRows=inEdit?editSets.map((set,i)=>{
+      const[a,b]=set||[null,null];
+      return `<div style="display:flex;align-items:center;gap:8px;margin-top:8px"><span class="lbl" style="min-width:80px">第${i+1}セット</span><input type="number" data-hid="${h.id}" data-set="${i}" data-side="0" value="${a!==null?a:''}" min="0" max="40" style="width:72px"><span style="font-size:18px">-</span><input type="number" data-hid="${h.id}" data-set="${i}" data-side="1" value="${b!==null?b:''}" min="0" max="40" style="width:72px"></div>`;
+    }).join(''):`<div class="history-sets">各セット: ${setsStr}</div>`;
+    html+=`<div class="history-item" data-history="${h.id}">
+      <div style="flex:1">
         <div style="font-weight:700">${h.p1} <span style="color:#e63000">${r.w1}-${r.w2}</span> ${h.p2}</div>
-        <div class="history-sets">各セット: ${setsStr}</div>
-        <div style="margin-top:2px"><span class="table-label">${h.tableLabel}</span></div>
+        ${setRows}
+        <div style="margin-top:8px"><span class="table-label">${h.tableLabel}</span></div>
       </div>
-      <span class="winner-badge">${winner}</span>
+      <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
+        <span class="winner-badge">${winner}</span>
+        ${inEdit?`<button class="ghost" data-cancel-history="${h.id}">キャンセル</button>`:`<button class="ghost" data-edit-history="${h.id}">編集</button>`}
+        ${inEdit?`<button class="confirm-btn" data-save-history="${h.id}">保存</button>`:''}
+      </div>
     </div>`;
   }
   return html+`</div>`;
@@ -371,6 +435,7 @@ function renderHistory(){
 function renderLeagueView(){
   const ps=S.players.filter(x=>x);
   const league=getLeague();
+  const exportText=buildExportText();
   let html=`<div class="card"><div class="section-title">対戦マトリクス</div><div style="overflow-x:auto"><table><tr><th></th>`;
   for(const p of ps)html+=`<th>${p}</th>`;
   html+=`</tr>`;
@@ -392,7 +457,13 @@ function renderLeagueView(){
     const cls=i===0?'rank1':i===1?'rank2':i===2?'rank3':'';
     html+=`<tr class="${cls}"><td>${medal||i+1}</td><td style="text-align:left;font-weight:600">${r.p}</td><td style="color:#888">${r.w+r.l}</td><td style="color:#2a8a2a;font-weight:700">${r.w}</td><td style="color:#cc2200">${r.l}</td><td>${r.sw}-${r.sl}</td></tr>`;
   });
-  return html+`</table></div>`;
+  html+=`</table></div>`;
+  html+=`<div class="card"><div class="section-title">テキスト出力</div><button class="ghost" id="exportBtn" style="font-size:18px;padding:12px 18px">試合結果をテキスト出力</button>`;
+  if(S.exportVisible){
+    html+=`<textarea id="exportTextArea" readonly rows="10" style="width:100%;font-size:14px;padding:12px;margin-top:12px;white-space:pre-wrap;resize:vertical">${exportText}</textarea><button class="ghost" id="copyExportBtn" style="margin-top:12px;font-size:18px;padding:12px 18px">結果をコピー</button>`;
+  }
+  html+=`</div>`;
+  return html;
 }
 
 function updateMatchCard(mid){
@@ -402,7 +473,8 @@ function updateMatchCard(mid){
   if(!m)return;
   const sets=S.activeSets[mid]||emptySetsList();
   const{w1,w2}=calcSets(sets);
-  const finished=w1>=3||w2>=3;
+  const winCount=getWinCount();
+  const finished=w1>=winCount||w2>=winCount;
   let totalRow=card.querySelector('.total-row');
   if(w1>0||w2>0){
     const html=`<span class="total-score">${w1} - ${w2}</span>${finished?`<span class="winner-badge">${w1>w2?m.p1:m.p2} 勝利！</span>`:''}`;
@@ -417,7 +489,7 @@ function updateMatchCard(mid){
     const si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
     const[a,b]=sets[si]||[null,null];
     const prevW1=calcSets(sets.slice(0,si)).w1,prevW2=calcSets(sets.slice(0,si)).w2;
-    const dis=(prevW1>=3||prevW2>=3)||((w1>=3||w2>=3)&&a===null&&b===null);
+    const dis=(prevW1>=winCount||prevW2>=winCount)||((w1>=winCount||w2>=winCount)&&a===null&&b===null);
     if(document.activeElement!==inp){inp.value=(side===0?a:b)!==null?(side===0?a:b):'';}
     inp.disabled=dis;
   });
@@ -427,6 +499,7 @@ function attachEvents(){
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>{S.view=el.dataset.tab;render();};});
   const tc=document.getElementById('tableCount');
   if(tc)tc.onchange=()=>{S.tables=Math.max(1,parseInt(tc.value)||1);};
+  document.querySelectorAll('input[name=setCount]').forEach(radio=>{radio.onchange=()=>{S.setsCount=parseInt(radio.value)||5;}});
   document.querySelectorAll('[data-pi]').forEach(inp=>{inp.oninput=()=>{S.players[parseInt(inp.dataset.pi)]=inp.value;};});
   document.querySelectorAll('[data-rm]').forEach(btn=>{btn.onclick=()=>{const i=parseInt(btn.dataset.rm);S.players.splice(i,1);if(!S.players.length)S.players=[''];render();};});
   const ap=document.getElementById('addPlayer');
@@ -452,6 +525,26 @@ function attachEvents(){
   document.querySelectorAll('[data-confirm]').forEach(btn=>{
     btn.onclick=()=>confirmMatch(btn.dataset.confirm);
   });
+  document.querySelectorAll('[data-edit-history]').forEach(btn=>{btn.onclick=()=>{startEditHistory(btn.dataset.editHistory);render();};});
+  document.querySelectorAll('[data-cancel-history]').forEach(btn=>{btn.onclick=()=>{cancelEditHistory(btn.dataset.cancelHistory);render();};});
+  document.querySelectorAll('[data-save-history]').forEach(btn=>{btn.onclick=()=>{saveHistoryEdit(btn.dataset.saveHistory);render();};});
+  document.querySelectorAll('input[data-hid]').forEach(inp=>{
+    inp.oninput=()=>{
+      const id=inp.dataset.hid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
+      if(!S.editingSets[id])return;
+      const raw=inp.value;
+      S.editingSets[id][si][side]=raw===''?null:parseInt(raw);
+    };
+  });
+  const exportBtn=document.getElementById('exportBtn');
+  if(exportBtn)exportBtn.onclick=()=>{S.exportVisible=!S.exportVisible;render();};
+  const copyBtn=document.getElementById('copyExportBtn');
+  if(copyBtn)copyBtn.onclick=()=>{
+    const ta=document.getElementById('exportTextArea');
+    if(!ta) return;
+    ta.select();
+    try{document.execCommand('copy');alert('テキストをコピーしました');}catch(e){alert('コピーに失敗しました');}
+  };
 }
 
 render();
