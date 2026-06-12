@@ -126,6 +126,10 @@ const S={
 
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 
+function saveState(){localStorage.setItem('tableLeagueState',JSON.stringify(S));}
+function loadState(){const saved=localStorage.getItem('tableLeagueState');if(saved){try{const loaded=JSON.parse(saved);Object.assign(S,loaded);}catch(e){}}}
+function resetState(){S.phase='setup';S.tables=2;S.setsCount=5;S.players=['',''];S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;localStorage.removeItem('tableLeagueState');}
+
 function buildAllPairs(players){
   const pairs=[];
   for(let i=0;i<players.length;i++)
@@ -316,6 +320,7 @@ function render(){
   const root=document.getElementById('root');
   root.innerHTML=S.phase==='setup'?renderSetup():renderMain();
   attachEvents();
+  saveState();
 }
 
 function renderSetup(){
@@ -507,7 +512,7 @@ function attachEvents(){
   const sl=document.getElementById('startLeague');
   if(sl)sl.onclick=()=>startLeague();
   const back=document.getElementById('backToSetup');
-  if(back)back.onclick=()=>{S.phase='setup';S.view='matches';render();};
+  if(back)back.onclick=()=>{resetState();render();};
   document.querySelectorAll('input[data-mid]').forEach(inp=>{
     inp.oninput=()=>{
       const mid=inp.dataset.mid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
@@ -547,5 +552,6 @@ function attachEvents(){
   };
 }
 
+loadState();
 render();
 </script>
