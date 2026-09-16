@@ -91,6 +91,27 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 .history-sets{font-size:18px;color:#888;margin-top:6px;line-height:1.8}
 .empty-slot{border:2px dashed #e0e0e0;border-radius:10px;padding:28px;text-align:center;color:#ccc;font-size:18px}
 .remaining-info{background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:12px 16px;font-size:18px;color:#888;margin-top:12px}
+/* Scoreboard modal */
+.scoreboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:50}
+.scoreboard{background:#fff;border-radius:12px;padding:24px;min-width:320px;max-width:720px;width:90%;box-shadow:0 24px 48px rgba(0,0,0,0.35);font-size:18px}
+.scoreboard .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.scoreboard .names{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px}
+.scoreboard .points{display:flex;gap:20px;align-items:center;justify-content:center;margin:18px 0}
+.scoreboard .point{background:#111;color:#ffd93b;padding:8px 22px;border-radius:8px;font-size:72px;line-height:1;min-width:120px;min-height:160px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2)}
+.scoreboard .sets{display:flex;gap:20px;align-items:center;justify-content:center}
+.scoreboard .set{background:#fff0ec;padding:8px 14px;border-radius:8px;font-weight:800}
+.scoreboard .controls{display:flex;gap:12px;justify-content:center;margin-top:18px}
+.scoreboard .swap-btn{background:#222;color:#fff;border:1px solid #222;padding:8px 12px;border-radius:8px;cursor:pointer}
+.scoreboard .close-x{background:transparent;border:none;font-size:26px;cursor:pointer;color:#888}
+.scoreboard .control-main{display:flex;gap:12px}
+.scoreboard .control-main button{min-width:80px;padding:12px 18px;font-size:18px}
+@media (max-width:640px){
+  .scoreboard{width:100%;height:100vh;border-radius:0;padding:12px;display:flex;flex-direction:column;justify-content:center}
+  .scoreboard .points{width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 5%;gap:2%}
+  .scoreboard .point{width:40%;min-width:40%;min-height:60vh;border-radius:10px;font-size:120px}
+  .scoreboard .sets{margin-top:8px}
+  .scoreboard .controls{position:absolute;left:0;right:0;bottom:28px;justify-content:center}
+}
 </style>
 <div id="app">
 <div class="creator-credit">
@@ -105,6 +126,29 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 <h1>🏓 卓球リーグ</h1>
 <div class="sub">Table Tennis League Manager</div>
 <div id="root"></div>
+  <!-- Scoreboard modal -->
+  <div class="scoreboard-overlay" id="scoreboardOverlay">
+    <div class="scoreboard" role="dialog" aria-modal="true" id="scoreboard">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="names" id="sbNames"><span id="sbLeftName"></span> <button class="swap-btn" id="sbSwap">⇄</button> <span id="sbRightName"></span></div>
+        <button class="close-x" id="sbClose">×</button>
+      </div>
+      <div class="points">
+        <div class="point" id="sbLeftPoint">0</div>
+        <div style="font-size:22px;font-weight:700">ポイント</div>
+        <div class="point" id="sbRightPoint">0</div>
+      </div>
+      <div class="sets">
+        <div class="set" id="sbLeftSets">0</div>
+        <div style="font-size:16px;color:#888">セット</div>
+        <div class="set" id="sbRightSets">0</div>
+      </div>
+      <div class="controls">
+        <button class="ghost" id="sbCommit">確定</button>
+        <button class="ghost" id="sbApplyClose">×</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 const S={
@@ -345,7 +389,7 @@ ${S.players.filter(x=>x.trim()).length>=2?'':`<div class="alert">選手を2名�
 }
 
 function renderMain(){
-  const header=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><button class="ghost" id="backToSetup">設定画面に戻る</button></div>`;
+  const header=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><div style="display:flex;gap:8px;align-items:center"><button class="ghost" id="openScoreboard">得点板</button><button class="ghost" id="backToSetup">設定画面に戻る</button></div></div>`;
   if(S.view==='history')return header+renderHistory();
   if(S.view==='league')return header+renderLeagueView();
   return header+renderMatches();
@@ -371,6 +415,9 @@ function renderMatches(){
     html+=`<div class="match-card active" data-card="${m.id}">
       <div class="match-header">
         <span class="table-label">台${ti+1}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="ghost" data-open-score="${m.id}">得点板</button>
+        </div>
         <span class="badge live">● LIVE</span>
       </div>
       <div class="players-line">${m.p1} <span class="vs">vs</span> ${m.p2}</div>
@@ -500,6 +547,72 @@ function updateMatchCard(mid){
   });
 }
 
+// Scoreboard modal state and functions
+const SB={mid:null,left:0,right:0,leftSets:0,rightSets:0};
+function updateScoreboardUI(){
+  const ol=document.getElementById('scoreboardOverlay');
+  if(!ol) return;
+  document.getElementById('sbLeftName').textContent=SB.leftName||'';
+  document.getElementById('sbRightName').textContent=SB.rightName||'';
+  document.getElementById('sbLeftPoint').textContent=SB.left;
+  document.getElementById('sbRightPoint').textContent=SB.right;
+  document.getElementById('sbLeftSets').textContent=SB.leftSets;
+  document.getElementById('sbRightSets').textContent=SB.rightSets;
+}
+
+function openScoreboard(mid){
+  const m=S.activeMatches.find(x=>x.id===mid);
+  if(!m) return alert('試合が見つかりません');
+  SB.mid=mid; SB.leftName=m.p1; SB.rightName=m.p2;
+  const sets=S.activeSets[mid]||emptySetsList();
+  const idx=sets.findIndex(s=>s[0]===null&&s[1]===null);
+  const curIdx=idx===-1?0:idx;
+  const cur=sets[curIdx]||[null,null];
+  SB.left=(cur[0]===null?0:cur[0]); SB.right=(cur[1]===null?0:cur[1]);
+  const r=calcSets(sets);
+  SB.leftSets=r.w1; SB.rightSets=r.w2;
+  const ol=document.getElementById('scoreboardOverlay');
+  if(ol){ol.style.display='flex';}
+  updateScoreboardUI();
+}
+
+function closeScoreboard(){
+  const ol=document.getElementById('scoreboardOverlay');
+  if(ol) ol.style.display='none';
+  SB.mid=null;
+}
+
+function applyScoreToMatch(commit){
+  const mid=SB.mid; if(!mid) return;
+  if(!S.activeSets[mid]) S.activeSets[mid]=emptySetsList();
+  const sets=S.activeSets[mid];
+  const idx=sets.findIndex(s=>s[0]===null&&s[1]===null);
+  const useIdx=idx===-1?sets.length-1:idx;
+  // Map left/right scoreboard values to match p1/p2 by name (left/right display may swap)
+  const m=S.activeMatches.find(x=>x.id===mid);
+  if(!m) return;
+  let p1score,p2score;
+  // if SB.leftName corresponds to m.p1, left->p1, else left->p2
+  if(SB.leftName===m.p1){ p1score=Number(SB.left)||0; p2score=Number(SB.right)||0; }
+  else if(SB.leftName===m.p2){ p1score=Number(SB.right)||0; p2score=Number(SB.left)||0; }
+  else { // fallback: assume left->p1
+    p1score=Number(SB.left)||0; p2score=Number(SB.right)||0;
+  }
+  sets[useIdx]=[p1score,p2score];
+  // update set totals
+  const r=calcSets(sets);
+  SB.leftSets=r.w1; SB.rightSets=r.w2;
+  // if commit (確定): reset points and swap displayed names/sets in modal
+  if(commit){
+    // swap displayed names and sets in modal (visual)
+    const tmpName=SB.leftName; SB.leftName=SB.rightName; SB.rightName=tmpName;
+    const tmpSets=SB.leftSets; SB.leftSets=SB.rightSets; SB.rightSets=tmpSets;
+    SB.left=0; SB.right=0;
+  }
+  updateMatchCard(mid);
+  updateScoreboardUI();
+}
+
 function attachEvents(){
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>{S.view=el.dataset.tab;render();};});
   const tc=document.getElementById('tableCount');
@@ -550,6 +663,28 @@ function attachEvents(){
     ta.select();
     try{document.execCommand('copy');alert('テキストをコピーしました');}catch(e){alert('コピーに失敗しました');}
   };
+  // Open scoreboard from header button (first active match) or per-table button
+  const hdrSb=document.getElementById('openScoreboard');
+  if(hdrSb) hdrSb.onclick=()=>{ const m=S.activeMatches[0]; if(m) openScoreboard(m.id); else alert('現在試合中の対戦がありません'); };
+  document.querySelectorAll('[data-open-score]').forEach(btn=>{btn.onclick=()=>openScoreboard(btn.dataset.openScore);});
+  // Modal controls
+  const sbOverlay=document.getElementById('scoreboardOverlay');
+  const sbLeftPoint=document.getElementById('sbLeftPoint');
+  const sbRightPoint=document.getElementById('sbRightPoint');
+  const sbLeftSets=document.getElementById('sbLeftSets');
+  const sbRightSets=document.getElementById('sbRightSets');
+  const sbSwap=document.getElementById('sbSwap');
+  const sbClose=document.getElementById('sbClose');
+  const sbCommit=document.getElementById('sbCommit');
+  const sbApplyClose=document.getElementById('sbApplyClose');
+  if(sbLeftPoint) sbLeftPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const y=e.clientY-rect.top;if(y<rect.height*(2/3)){SB.left=Number(SB.left)+1}else{SB.left=Math.max(0,Number(SB.left)-1)};updateScoreboardUI();};
+  if(sbRightPoint) sbRightPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const y=e.clientY-rect.top;if(y<rect.height*(2/3)){SB.right=Number(SB.right)+1}else{SB.right=Math.max(0,Number(SB.right)-1)};updateScoreboardUI();};
+  if(sbLeftSets) sbLeftSets.onclick=()=>{ SB.leftSets=Number(SB.leftSets)+1; updateScoreboardUI(); };
+  if(sbRightSets) sbRightSets.onclick=()=>{ SB.rightSets=Number(SB.rightSets)+1; updateScoreboardUI(); };
+  if(sbSwap) sbSwap.onclick=()=>{ const tmp=SB.leftName; SB.leftName=SB.rightName; SB.rightName=tmp; const t2=SB.left; SB.left=SB.right; SB.right=t2; const t3=SB.leftSets; SB.leftSets=SB.rightSets; SB.rightSets=t3; updateScoreboardUI(); };
+  if(sbClose) sbClose.onclick=()=>{ closeScoreboard(); };
+  if(sbCommit) sbCommit.onclick=()=>{ applyScoreToMatch(true); };
+  if(sbApplyClose) sbApplyClose.onclick=()=>{ applyScoreToMatch(false); closeScoreboard(); S.view='matches'; render(); };
 }
 
 loadState();
