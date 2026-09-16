@@ -680,8 +680,8 @@ function attachEvents(){
   const sbClose=document.getElementById('sbClose');
   const sbCommit=document.getElementById('sbCommit');
   const sbApplyClose=document.getElementById('sbApplyClose');
-  if(sbLeftPoint) sbLeftPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const y=e.clientY-rect.top;if(y<rect.height*(2/3)){SB.left=Number(SB.left)+1}else{SB.left=Math.max(0,Number(SB.left)-1)};updateScoreboardUI();};
-  if(sbRightPoint) sbRightPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const y=e.clientY-rect.top;if(y<rect.height*(2/3)){SB.right=Number(SB.right)+1}else{SB.right=Math.max(0,Number(SB.right)-1)};updateScoreboardUI();};
+  if(sbLeftPoint) sbLeftPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* right 2/3 = +1, left 1/3 = -1 */if(x>rect.width*(1/3)){SB.left=Number(SB.left)+1}else{SB.left=Math.max(0,Number(SB.left)-1)};updateScoreboardUI();};
+  if(sbRightPoint) sbRightPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* right 2/3 = +1, left 1/3 = -1 */if(x>rect.width*(1/3)){SB.right=Number(SB.right)+1}else{SB.right=Math.max(0,Number(SB.right)-1)};updateScoreboardUI();};
   if(sbLeftSets) sbLeftSets.onclick=()=>{ SB.leftSets=Number(SB.leftSets)+1; updateScoreboardUI(); };
   if(sbRightSets) sbRightSets.onclick=()=>{ SB.rightSets=Number(SB.rightSets)+1; updateScoreboardUI(); };
   if(sbSwap) sbSwap.onclick=()=>{ const tmp=SB.leftName; SB.leftName=SB.rightName; SB.rightName=tmp; const t2=SB.left; SB.left=SB.right; SB.right=t2; const t3=SB.leftSets; SB.leftSets=SB.rightSets; SB.rightSets=t3; updateScoreboardUI(); };
