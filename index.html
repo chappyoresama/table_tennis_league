@@ -99,7 +99,7 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 .scoreboard .points{display:flex;gap:20px;align-items:center;justify-content:center;margin:18px 0}
 .scoreboard .point{background:#111;color:#ffd93b;padding:8px 22px;border-radius:8px;font-size:72px;line-height:1;min-width:120px;min-height:160px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2)}
 .scoreboard .point{position:relative}
-.scoreboard .point.left::after{content:'';position:absolute;left:12%;right:12%;bottom:10px;height:8px;background:#e53935;border-radius:6px}
+/* red underline removed per request */
 .scoreboard .center-column{display:flex;flex-direction:column;align-items:center;gap:8px;width:56px}
 .scoreboard .mini-score{background:#111;color:#fff;padding:6px 10px;border-radius:6px;font-size:20px}
 .scoreboard .swap-center{background:#111;color:#fff;padding:6px 10px;border-radius:999px;font-size:20px}
@@ -111,11 +111,15 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 .scoreboard .control-main{display:flex;gap:12px}
 .scoreboard .control-main button{min-width:80px;padding:12px 18px;font-size:18px}
 @media (max-width:640px){
-  .scoreboard{width:92vh;max-width:96vw;height:auto;border-radius:12px;padding:18px;display:flex;flex-direction:column;justify-content:center;transform:rotate(90deg);transform-origin:center center;aspect-ratio:16/7}
-  .scoreboard .points{width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 3%;gap:2%}
-  .scoreboard .point{width:40%;min-width:40%;min-height:60vh;border-radius:10px;font-size:120px}
+  .scoreboard-overlay{overflow:hidden}
+  /* make rotated scoreboard fit the viewport: use viewport units and caps */
+  .scoreboard{width:calc(100vh - 40px);max-width:96vw;height:auto;border-radius:12px;padding:12px;display:flex;flex-direction:column;justify-content:center;transform:rotate(90deg);transform-origin:center center;box-sizing:border-box}
+  .scoreboard .points{width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 2%;gap:2%}
+  .scoreboard .point{width:40%;min-width:40%;min-height:60vmin;border-radius:10px;font-size:110px}
   .scoreboard .sets{margin-top:8px}
-  .scoreboard .controls{position:absolute;left:0;right:0;bottom:28px;justify-content:center}
+  .scoreboard .controls{position:absolute;left:0;right:0;bottom:18px;justify-content:center}
+  /* ensure scoreboard never overflows screen after rotation */
+  .scoreboard{max-height:calc(100vw - 32px)}
 }
 </style>
 <div id="app">
