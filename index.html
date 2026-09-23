@@ -540,18 +540,18 @@ async function restoreLastMatch(){
     return false;
   }
 
-  // まずローカルに保存されているデータを読み込む
-  if(loadState(id)){
-    S.phase = 'league';
-    S.view = 'matches';
+  // 更新時はFirestoreの最新データを優先する
+  if(await loadRemoteState(id)){
+    S.phase='league';
+    S.view='matches';
     watchMatch(id);
     return true;
   }
 
-  // ローカルになければFirestoreから読み込む
-  if(await loadRemoteState(id)){
-    S.phase = 'league';
-    S.view = 'matches';
+  // Firestoreから取得できなかった場合だけローカルを使用
+  if(loadState(id)){
+    S.phase='league';
+    S.view='matches';
     watchMatch(id);
     return true;
   }
