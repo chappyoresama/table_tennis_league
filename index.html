@@ -476,12 +476,28 @@ function watchMatch(matchId){
 async function loadRemoteState(matchId){
   const id=String(matchId||'').replace(/\D/g,'').slice(0,6);
   if(!/^\d{6}$/.test(id))return false;
+
   try{
     const snapshot=await getDoc(doc(db,'matches',id));
+
     if(!snapshot.exists())return false;
-    Object.assign(S,snapshot.data());
-    localStorage.setItem(matchStorageKey(id),JSON.stringify(S));
+
+    const data=snapshot.data();
+
+    // Firestore保存時にJSON文字列にしたactiveSetsを元の配列に戻す
+    if(typeof data.activeSets === 'string'){
+      data.activeSets = JSON.parse(data.activeSets);
+    }
+
+    Object.assign(S,data);
+
+    localStorage.setItem(
+      matchStorageKey(id),
+      JSON.stringify(S)
+    );
+
     return true;
+
   }catch(error){
     console.error('Firestoreからの読み込みに失敗しました',error);
     alert(`試合番号を検索できませんでした。FirebaseのFirestore設定を確認してください。\n\n${error.code||error.message}`);
