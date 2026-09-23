@@ -1,6 +1,7 @@
 <style id="gl-editor-styles">
 @media (max-width: 375px) {
   .ghost { display: none; }
+  #loadMatch { display: block; }
 }
 </style>
 
@@ -398,14 +399,20 @@ function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.fl
 
 function matchStorageKey(matchId){return `tableLeagueMatch_${matchId}`;}
 async function saveState(){
-  if(!S.matchId)return;
+  if(!S.matchId)return false;
   const state=JSON.stringify(S);
   localStorage.setItem(matchStorageKey(S.matchId),state);
   localStorage.setItem('tableLeagueLastMatch',S.matchId);
   if(!applyingRemoteState){
-    try{await setDoc(doc(db,'matches',S.matchId),JSON.parse(state));}
-    catch(error){console.error('Firestoreへの保存に失敗しました',error);}
+    try{
+      await setDoc(doc(db,'matches',S.matchId),JSON.parse(state));
+      console.log(`Firestoreへ試合 ${S.matchId} を保存しました`);
+    }catch(error){
+      console.error('Firestoreへの保存に失敗しました',error);
+      return false;
+    }
   }
+  return true;
 }
 function loadState(matchId){
   const id=String(matchId||'').replace(/\D/g,'').slice(0,6);
@@ -440,7 +447,11 @@ async function loadRemoteState(matchId){
     Object.assign(S,snapshot.data());
     localStorage.setItem(matchStorageKey(id),JSON.stringify(S));
     return true;
-  }catch(error){console.error('Firestoreからの読み込みに失敗しました',error);return false;}
+  }catch(error){
+    console.error('Firestoreからの読み込みに失敗しました',error);
+    alert(`試合番号を検索できませんでした。FirebaseのFirestore設定を確認してください。\n\n${error.code||error.message}`);
+    return false;
+  }
 }
 function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.players=['',''];S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
 
@@ -537,7 +548,11 @@ async function startLeague(){
   S.phase='league';S.view='matches';
   fillTables();
   watchMatch(S.matchId);
+  const saved=await saveState();
   render();
+  if(!saved){
+    alert(`試合番号 ${S.matchId} をFirestoreへ保存できませんでした。\n\nFirestoreのDatabase作成状態とルールを確認してください。`);
+  }
 }
 
 function confirmMatch(mid){
@@ -954,7 +969,7 @@ function attachEvents(){
   if(loadMatch)loadMatch.onclick=async()=>{
     const id=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
     if(!/^\d{6}$/.test(id)){alert('6桁の試合番号を入力してください');return;}
-    if(!loadState(id)&&!(await loadRemoteState(id))){alert('その試合番号の試合が見つかりません');return;}
+    if(!loadState(id)&&!(await loadRemoteState(id))){alert('その試合番号の試合が見つかりません。作成した端末で試合を開始し、番号を確認してください。');return;}
     watchMatch(id);
     S.phase='league';S.view='matches';render();
   };
