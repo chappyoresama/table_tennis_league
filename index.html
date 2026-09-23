@@ -398,21 +398,52 @@ const S={
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 
 function matchStorageKey(matchId){return `tableLeagueMatch_${matchId}`;}
+  
+  function findNestedArrays(obj, path = ''){
+  if(Array.isArray(obj)){
+    obj.forEach((item, i) => {
+      if(Array.isArray(item)){
+        console.log('★ ネストされた配列:', path + '[' + i + ']', item);
+      }else if(item && typeof item === 'object'){
+        findNestedArrays(item, path + '[' + i + ']');
+      }
+    });
+  }else if(obj && typeof obj === 'object'){
+    Object.entries(obj).forEach(([key, value]) => {
+      findNestedArrays(value, path ? path + '.' + key : key);
+    });
+  }
+}
 async function saveState(){
   if(!S.matchId)return false;
-  const state=JSON.stringify(S);
+
+  const state = JSON.stringify(S);
+
   localStorage.setItem(matchStorageKey(S.matchId),state);
   localStorage.setItem('tableLeagueLastMatch',S.matchId);
+
   if(!applyingRemoteState){
     try{
-      console.log('Firestore保存データ:', JSON.parse(state));
-      await setDoc(doc(db,'matches',S.matchId),JSON.parse(state));
+      const data = JSON.parse(state);
+
+      console.log('Firestore保存データ:', data);
+
+      // ネストされた配列を探す
+      findNestedArrays(data);
+
+      await setDoc(
+        doc(db,'matches',S.matchId),
+        data
+      );
+
       console.log(`Firestoreへ試合 ${S.matchId} を保存しました`);
+
     }catch(error){
       console.error('Firestoreへの保存に失敗しました',error);
       return false;
     }
   }
+
   return true;
 }
 function loadState(matchId){
