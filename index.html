@@ -426,10 +426,19 @@ async function saveState(){
     try{
       const data = JSON.parse(state);
 
-      console.log('Firestore保存データ:', data);
+      // Firestoreでは「配列の中の配列」が使えないため、
+      // activeSetsのネスト配列だけオブジェクトに変換する
+      if(data.activeSets){
+        Object.keys(data.activeSets).forEach(key => {
+          if(Array.isArray(data.activeSets[key])){
+            data.activeSets[key] = Object.fromEntries(
+              data.activeSets[key].map((value, index) => [index, value])
+            );
+          }
+        });
+      }
 
-      // ネストされた配列を探す
-      findNestedArrays(data);
+      console.log('Firestore保存データ:', data);
 
       await setDoc(
         doc(db,'matches',S.matchId),
