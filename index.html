@@ -431,6 +431,12 @@ async function saveState(){
       if(data.activeSets){
         data.activeSets = JSON.stringify(data.activeSets);
       }
+      if(data.history){
+        data.history = JSON.stringify(data.history);
+      }
+      if(data.editingSets){
+        data.editingSets = JSON.stringify(data.editingSets);
+      }
 
       console.log('Firestore保存データ:', data);
 
@@ -462,6 +468,7 @@ function createMatchId(){
   return id;
 }
 function getShareUrl(){return `${location.href.split('#')[0]}#match=${S.matchId}`;}
+function setMatchUrl(matchId){location.hash=`match=${matchId}`;}
 function watchMatch(matchId){
   if(!/^\d{6}$/.test(matchId))return;
   onSnapshot(doc(db,'matches',matchId),snapshot=>{
@@ -469,6 +476,12 @@ function watchMatch(matchId){
     const data=snapshot.data();
     if(typeof data.activeSets === 'string'){
       try{data.activeSets=JSON.parse(data.activeSets);}catch(error){console.error('activeSetsの復元に失敗しました',error);return;}
+    }
+    if(typeof data.history === 'string'){
+      try{data.history=JSON.parse(data.history);}catch(error){console.error('historyの復元に失敗しました',error);return;}
+    }
+    if(typeof data.editingSets === 'string'){
+      try{data.editingSets=JSON.parse(data.editingSets);}catch(error){console.error('editingSetsの復元に失敗しました',error);return;}
     }
     const remote=JSON.stringify(data);
     if(remote===JSON.stringify(S))return;
@@ -491,6 +504,12 @@ async function loadRemoteState(matchId){
     // Firestore保存時にJSON文字列にしたactiveSetsを元の配列に戻す
     if(typeof data.activeSets === 'string'){
       data.activeSets = JSON.parse(data.activeSets);
+    }
+    if(typeof data.history === 'string'){
+      data.history = JSON.parse(data.history);
+    }
+    if(typeof data.editingSets === 'string'){
+      data.editingSets = JSON.parse(data.editingSets);
     }
 
     Object.assign(S,data);
@@ -644,7 +663,7 @@ async function startLeague(){
   const requestedId=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
   if(requestedId){
     if(!/^\d{6}$/.test(requestedId)){alert('試合番号は6桁の数字で入力してください');return;}
-    if(loadState(requestedId)||await loadRemoteState(requestedId)){S.phase='league';S.view='matches';watchMatch(requestedId);render();return;}
+    if(loadState(requestedId)||await loadRemoteState(requestedId)){setMatchUrl(requestedId);S.phase='league';S.view='matches';watchMatch(requestedId);render();return;}
     S.matchId=requestedId;
   }else if(!S.matchId){
     S.matchId=createMatchId();
@@ -654,6 +673,7 @@ async function startLeague(){
   S.activeMatches=[];S.activeSets={};S.history=[];
   S.phase='league';S.view='matches';
   fillTables();
+  setMatchUrl(S.matchId);
   watchMatch(S.matchId);
   const saved=await saveState();
   render();
@@ -1077,6 +1097,7 @@ function attachEvents(){
     const id=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
     if(!/^\d{6}$/.test(id)){alert('6桁の試合番号を入力してください');return;}
     if(!loadState(id)&&!(await loadRemoteState(id))){alert('その試合番号の試合が見つかりません。作成した端末で試合を開始し、番号を確認してください。');return;}
+    setMatchUrl(id);
     watchMatch(id);
     S.phase='league';S.view='matches';render();
   };
@@ -1087,7 +1108,7 @@ function attachEvents(){
     catch(e){prompt('このリンクを共有してください',url);}
   };
   const back=document.getElementById('backToSetup');
-  if(back)back.onclick=()=>{resetState();render();};
+  if(back)back.onclick=()=>{resetState();history.replaceState(null,'',location.href.split('#')[0]);render();};
   document.querySelectorAll('input[data-mid]').forEach(inp=>{
     inp.oninput=()=>{
       const mid=inp.dataset.mid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
