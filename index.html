@@ -426,16 +426,10 @@ async function saveState(){
     try{
       const data = JSON.parse(state);
 
-      // Firestoreでは「配列の中の配列」が使えないため、
-      // activeSetsのネスト配列だけオブジェクトに変換する
+      // Firestoreではネストした配列を保存できないため、
+      // activeSetsだけJSON文字列として保存する
       if(data.activeSets){
-        Object.keys(data.activeSets).forEach(key => {
-          if(Array.isArray(data.activeSets[key])){
-            data.activeSets[key] = Object.fromEntries(
-              data.activeSets[key].map((value, index) => [index, value])
-            );
-          }
-        });
+        data.activeSets = JSON.stringify(data.activeSets);
       }
 
       console.log('Firestore保存データ:', data);
