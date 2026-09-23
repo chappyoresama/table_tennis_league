@@ -405,6 +405,7 @@ async function saveState(){
   localStorage.setItem('tableLeagueLastMatch',S.matchId);
   if(!applyingRemoteState){
     try{
+      console.log('Firestore保存データ:', JSON.parse(state));
       await setDoc(doc(db,'matches',S.matchId),JSON.parse(state));
       console.log(`Firestoreへ試合 ${S.matchId} を保存しました`);
     }catch(error){
