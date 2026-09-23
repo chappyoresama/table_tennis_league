@@ -508,6 +508,35 @@ async function loadRemoteState(matchId){
     return false;
   }
 }
+async function restoreMatchFromUrl(){
+  const hash = location.hash;
+  const match = hash.match(/^#match=(\d{6})$/);
+
+  if(!match)return false;
+
+  const id = match[1];
+
+  if(loadState(id)){
+    S.phase = 'league';
+    S.view = 'matches';
+    watchMatch(id);
+    return true;
+  }
+
+  if(await loadRemoteState(id)){
+    // Firestoreから取得したactiveSetsを元に戻す
+    if(typeof S.activeSets === 'string'){
+      S.activeSets = JSON.parse(S.activeSets);
+    }
+
+    S.phase = 'league';
+    S.view = 'matches';
+    watchMatch(id);
+    return true;
+  }
+
+  return false;
+}
 function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.players=['',''];S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
 
 function buildAllPairs(players){
@@ -520,6 +549,29 @@ function buildAllPairs(players){
 
 function getWinCount(){return Math.ceil(S.setsCount/2);}
 function emptySetsList(count=S.setsCount){return Array(count).fill(null).map(()=>[null,null]);}
+
+function ensureMatchSets(mid){
+  let sets=S.activeSets[mid];
+  if(typeof sets === 'string'){
+    try{sets=JSON.parse(sets);}catch(error){sets=null;}
+  }
+  if(!Array.isArray(sets))sets=emptySetsList();
+  for(let i=0;i<sets.length;i++){
+    if(!Array.isArray(sets[i]))sets[i]=[null,null];
+    if(sets[i].length<2)sets[i]=[sets[i][0]??null, null];
+  }
+  S.activeSets[mid]=sets;
+  return sets;
+}
+
+function updateAutomaticOpponentScore(mid, setIndex, side, score){
+  const sets=ensureMatchSets(mid);
+  const value=Number(score);
+  if(!Number.isFinite(value))return;
+  sets[setIndex][side]=value;
+  const opponent=side===0?1:0;
+  sets[setIndex][opponent]=value<=9?11:value+2;
+}
 
 function calcSets(sets){
   let w1=0,w2=0;
@@ -887,7 +939,7 @@ function updateMatchCard(mid){
   if(!card)return;
   const m=S.activeMatches.find(x=>x.id===mid);
   if(!m)return;
-  const sets=S.activeSets[mid]||emptySetsList();
+  const sets=ensureMatchSets(mid);
   const{w1,w2}=calcSets(sets);
   const winCount=getWinCount();
   const finished=w1>=winCount||w2>=winCount;
@@ -1039,14 +1091,11 @@ function attachEvents(){
   document.querySelectorAll('input[data-mid]').forEach(inp=>{
     inp.oninput=()=>{
       const mid=inp.dataset.mid,si=parseInt(inp.dataset.set),side=parseInt(inp.dataset.side);
-      if(!S.activeSets[mid])S.activeSets[mid]=emptySetsList();
       const raw=inp.value;
-      if(raw===''){S.activeSets[mid][si][side]=null;updateMatchCard(mid);return;}
-      const v=parseInt(raw);if(isNaN(v))return;
-      S.activeSets[mid][si][side]=v;
-      const other=1-side;
-      if(v<=9)S.activeSets[mid][si][other]=11;
-      else S.activeSets[mid][si][other]=v+2;
+      const sets=ensureMatchSets(mid);
+      if(raw===''){sets[si][side]=null;updateMatchCard(mid);return;}
+      const v=parseInt(raw,10);if(isNaN(v))return;
+      updateAutomaticOpponentScore(mid,si,side,v);
       updateMatchCard(mid);
     };
   });
