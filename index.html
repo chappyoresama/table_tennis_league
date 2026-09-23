@@ -466,10 +466,14 @@ function watchMatch(matchId){
   if(!/^\d{6}$/.test(matchId))return;
   onSnapshot(doc(db,'matches',matchId),snapshot=>{
     if(!snapshot.exists())return;
-    const remote=JSON.stringify(snapshot.data());
+    const data=snapshot.data();
+    if(typeof data.activeSets === 'string'){
+      try{data.activeSets=JSON.parse(data.activeSets);}catch(error){console.error('activeSetsの復元に失敗しました',error);return;}
+    }
+    const remote=JSON.stringify(data);
     if(remote===JSON.stringify(S))return;
     applyingRemoteState=true;
-    try{Object.assign(S,snapshot.data());localStorage.setItem(matchStorageKey(matchId),remote);render();}
+    try{Object.assign(S,data);localStorage.setItem(matchStorageKey(matchId),remote);render();}
     finally{applyingRemoteState=false;}
   },error=>console.error('Firestoreの監視に失敗しました',error));
 }
