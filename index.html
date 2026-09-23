@@ -1,3 +1,8 @@
+<style id="gl-editor-styles">
+@media (max-width: 375px) {
+  .ghost { display: none; }
+}
+</style>
 
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
@@ -91,37 +96,217 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 .history-sets{font-size:18px;color:#888;margin-top:6px;line-height:1.8}
 .empty-slot{border:2px dashed #e0e0e0;border-radius:10px;padding:28px;text-align:center;color:#ccc;font-size:18px}
 .remaining-info{background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:12px 16px;font-size:18px;color:#888;margin-top:12px}
-/* Scoreboard modal */
-.scoreboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:50}
-.scoreboard{background:#fff;border-radius:12px;padding:24px;min-width:320px;max-width:720px;width:90%;box-shadow:0 24px 48px rgba(0,0,0,0.35);font-size:18px;position:relative}
-.scoreboard .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
-.scoreboard .names{display:flex;align-items:center;gap:12px;font-weight:800;font-size:20px;justify-content:center;width:100%}
-.scoreboard .points{display:flex;gap:20px;align-items:center;justify-content:center;margin:18px 0}
-.scoreboard .point{background:#111;color:#ffd93b;padding:8px 22px;border-radius:8px;font-size:72px;line-height:1;min-width:120px;min-height:200px;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2)}
-.scoreboard .point{position:relative}
-/* center-column removed; place sets between points */
-.scoreboard .sets{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:center}
-.scoreboard .set-label{font-size:16px;color:#888}
-.scoreboard .sets-between{display:flex;flex-direction:column;align-items:center;gap:6px}
-.scoreboard .set{background:#fff0ec;padding:8px 14px;border-radius:8px;font-weight:800}
-.scoreboard .controls{display:flex;gap:12px;justify-content:center;margin-top:18px}
-.scoreboard .swap-btn{background:#222;color:#fff;border:1px solid #222;padding:10px 16px;border-radius:12px;cursor:pointer;font-size:26px;line-height:1;min-width:48px}
-.scoreboard .close-x{background:transparent;border:none;font-size:26px;cursor:pointer;color:#888;position:absolute;top:12px;right:12px;z-index:60}
-.scoreboard .control-main{display:flex;gap:12px}
-.scoreboard .control-main button{min-width:80px;padding:12px 18px;font-size:18px}
-@media (max-width:640px){
-  .scoreboard-overlay{overflow:hidden}
-  /* make rotated scoreboard fit the viewport: use viewport units and caps */
-  .scoreboard{width:calc(100vh - 40px);max-width:96vw;height:auto;border-radius:12px;padding:12px;display:flex;flex-direction:column;justify-content:center;transform:rotate(90deg);transform-origin:center center;box-sizing:border-box}
-  .scoreboard .points{width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 2%;gap:2%}
-  .scoreboard .point{width:38%;min-width:38%;min-height:66vmin;border-radius:10px;font-size:110px;padding-top:6vmin;padding-bottom:6vmin}
-  .scoreboard .swap-btn{font-size:32px;padding:8px 12px}
-  .scoreboard .close-x{font-size:30px}
-  .scoreboard .sets{margin-top:8px}
-  .scoreboard .controls{position:absolute;left:0;right:0;bottom:18px;justify-content:center}
-  /* ensure scoreboard never overflows screen after rotation */
-  .scoreboard{max-height:calc(100vw - 32px)}
+.match-id-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;background:#fff7f3;border:1px solid #ffd2c4;border-radius:8px;padding:14px 16px;margin-bottom:18px}
+.match-id-label{color:#888;font-size:15px;letter-spacing:1px}
+.match-id-value{color:#e63000;font-size:26px;font-weight:800;letter-spacing:4px}
+.match-id-panel button{font-size:15px;padding:10px 14px}
+/* ==================== スコアボード ====================
+   この範囲の数値は、画面上のスコアボードだけに影響します。 */
+:root{
+  --score-number-size:200px; /* 左右の大きな得点の文字サイズ */
+  --score-box-min-width:120px; /* 左右の黒い得点ボックスの最小幅 */
+  --score-box-min-height:200px; /* 左右の黒い得点ボックスの最小高さ */
 }
+/* 画面全体を覆う半透明の背景です。普段は非表示で、.is-open の時だけ表示します。 */
+.scoreboard-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:50}
+.scoreboard-overlay.is-open{display:flex}
+/* 白いスコアボード本体です。padding:24px は内側の余白、min-width:320px は最小幅です。 */
+.scoreboard{background:#fff;border-radius:12px;padding:24px;min-width:320px;max-width:2000px;width:100%;box-shadow:0 24px 48px rgba(0,0,0,0.35);font-size:18px;position:relative}
+/* 使っていない行用の基本レイアウトです。 */
+.scoreboard .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+/* 選手名の間隔:12px、文字サイズ:20px です。 */
+.scoreboard .names{display:flex;align-items:center;gap:12px;font-weight:800;font-size:40px;justify-content:center;width:100%}
+/* 左右の得点とセット欄の間隔:20px、上下の余白:18px です。 */
+.scoreboard .points{display:flex;gap:20px;align-items:center;justify-content:center;margin:18px 0}
+/* 左右の黒い得点ボックスです。padding は数字の周囲、border-radius は角丸です。 */
+.scoreboard .point{position:relative;background:#111;color:#ffd93b;padding:8px 22px;border-radius:8px;font-size:var(--score-number-size);line-height:1;min-width:var(--score-box-min-width);min-height:var(--score-box-min-height);display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;box-shadow:inset 0 -6px 0 rgba(0,0,0,0.2)}
+/* セット数は左右の得点ボックスの間に縦に表示します。 */
+.scoreboard .sets{display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:center}
+/* 「セット」という文字です。font-size:16px は文字サイズです。 */
+.scoreboard .set-label{font-size:16px;color:#888}
+/* 左右のセット数を縦に並べる欄です。数字同士の間隔は6pxです。 */
+.scoreboard .sets-between{display:flex;flex-direction:column;align-items:center;gap:6px}
+/* セット数の薄赤い箱です。padding:8px 14px は上下左右の余白です。 */
+.scoreboard .set{background:#fff0ec;padding:8px 14px;border-radius:8px;font-weight:800}
+/* 確定・閉じるボタンの並びです。ボタン間隔は12px、上余白は18pxです。 */
+.scoreboard .controls{display:flex;gap:12px;justify-content:center;margin-top:18px}
+/* 選手入れ替えボタンです。画面幅に関係なく48px四方で固定し、文字を中央に置きます。 */
+.scoreboard .swap-btn{background:#222;color:#fff;border:1px solid #222;padding:0;border-radius:12px;cursor:pointer;font-size:26px;line-height:1;width:100px;height:48px;min-width:48px;min-height:48px;box-sizing:border-box;display:flex;align-items:center;justify-content:center}
+/* 右下の × ボタンです。全体用buttonのwidth:100%を上書きして画面中央へずれないようにします。 */
+.scoreboard-overlay .close-x{background:transparent;border:none;font-size:26px;cursor:pointer;color:#888;position:fixed!important;left:auto!important;top:auto!important;bottom:5vh!important;right:5vw!important;width:80px!important;min-width:80px!important;height:80px!important;min-height:80px!important;padding:0!important;transform:none!important;z-index:100}
+.scoreboard .control-main{display:flex;gap:12px}
+/* ボタンの最小幅・内側余白・文字サイズです。 */
+.scoreboard .control-main button{min-width:80px;padding:12px 18px;font-size:18px}
+/* 画面幅に関係なく、常に同じレイアウトで表示するスコアボード */
+/* 白い部分 */
+  .scoreboard{
+    position:fixed;
+
+    left:0;
+    top:0;
+
+    width:100vw !important;
+    height:100vh !important;
+
+    max-width:none !important;
+    max-height:none !important;
+
+    padding:0;
+
+    box-sizing:border-box;
+
+    transform:none !important;
+
+    overflow:hidden;
+  }
+
+  /* 中身だけ横向きにする */
+  .scoreboard-content{
+    width:100vh;
+    height:100vw;
+
+    box-sizing:border-box;
+
+    position:absolute;
+    left:50%;
+    top:50%;
+
+    transform:translate(-50%,-50%) rotate(90deg);
+    transform-origin:center center;
+  }
+
+/* 得点：上下に配置。padding/gap を変えると左右の余白と得点間隔が変わります。 */
+.scoreboard .points{
+  width:100%;
+  height:100%;
+
+  display:flex;
+  flex-direction:row;
+
+  align-items:center;
+  justify-content:space-between;
+
+  padding:4%;
+  box-sizing:border-box;
+
+  gap:0;
+}
+
+.scoreboard .point{
+  width: 30%;
+  min-width: 200px;
+
+  height: 85%;
+  min-height:0;
+
+  font-size:var(--score-number-size);
+
+  padding-top:4vmin;
+  padding-bottom:4vmin;
+
+  border-radius:10px;
+  box-sizing:border-box;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+  /* セット：左側。width:14% はセット欄の横幅、margin-top:6vmin は上位置です。 */
+.scoreboard .sets-between{
+  width:24%;
+  min-width:70px;
+
+  margin:0 -180px;
+  margin-bottom:-180px;
+
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  justify-content:center;
+
+  gap:4px;
+}
+
+.scoreboard .set{
+  padding:10px 50px;
+  font-size:60px;
+  box-sizing:border-box;
+}
+
+  /* リセット・確定：中央。left/top:50% は中央位置です。 */
+  .scoreboard .controls{
+    position:absolute;
+    left:50%;
+    top:30%;
+    transform:translate(-50%,-50%);
+    display:flex;
+    flex-direction:column;
+    gap:12px; /* 中央ボタン同士の間隔 */
+    z-index:55;
+  }
+
+  .scoreboard .controls .ghost{
+    border:3px solid #e63000; /* 中央ボタンの枠線の太さ */
+    color:#e63000;
+    background:transparent;
+    padding:5px 30px; /* 中央ボタンの内側余白 */
+    font-size:30px; /* 中央ボタンの文字サイズ */
+    border-radius:8px; /* 中央ボタンの角丸 */
+  }
+
+  /* 名前：左右の得点ボックスの上側。得点欄と同じ3列に揃えます。 */
+.scoreboard .names{
+  position:absolute;
+  left:4%; /* 得点欄の左側余白と同じ位置 */
+  top:3%; /* 得点ボックスの上側に置く位置 */
+  width:92%;
+  display:grid;
+  grid-template-columns:30% 34% 30%; /* 左得点・中央セット・右得点と同じ幅 */
+  justify-content:space-between;
+  align-items:center;
+  gap:0;
+}
+
+  .scoreboard .names span{
+    width:100%;
+    grid-row:1;
+    display:inline-block;
+    border:2px solid #111; /* 名前箱の枠線の太さ */
+    padding:10px 14px; /* 名前箱の内側余白 */
+    background:#fff;
+    border-radius:6px; /* 名前箱の角丸 */
+    font-size:18px; /* 名前の文字サイズ */
+    text-align:center;
+  }
+
+  .scoreboard .names span:first-child{grid-column:1}
+  .scoreboard .names span:last-child{grid-column:3}
+
+  /* 入れ替えボタンは左右の名前の間に置きます。 */
+ .scoreboard .swap-btn{
+  grid-column:2;
+  grid-row:1;
+  justify-self:center;
+  margin:0;
+}
+
+  /* ×ボタン。bottom/right:5vh・5vw は画面端からの距離を割合で指定します。 */
+  .scoreboard-overlay .close-x{
+    left:auto!important;
+    top:auto!important;
+    bottom:5vh!important;
+    right:5vw!important;
+    width:80px!important;
+    min-width:80px!important;
+    height:80px!important;
+    min-height:80px!important;
+    padding:0!important;
+    transform:none!important;
+    font-size:80px;
+    z-index:80;
+  }
+
 </style>
 <div id="app">
 <div class="creator-credit">
@@ -136,32 +321,47 @@ td{padding:12px 14px;text-align:center;border:1px solid #eee;color:#111}
 <h1>🏓 卓球リーグ</h1>
 <div class="sub">Table Tennis League Manager</div>
 <div id="root"></div>
-  <!-- Scoreboard modal -->
+  <!-- スコアボード本体。普段は非表示で、得点板ボタンを押した時だけ表示します。 -->
   <div class="scoreboard-overlay" id="scoreboardOverlay">
-    <div class="scoreboard" role="dialog" aria-modal="true" id="scoreboard">
+  <div class="scoreboard" role="dialog" aria-modal="true" id="scoreboard">
+
+    <div class="scoreboard-content">
+
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <div class="names" id="sbNames"><span id="sbLeftName"></span> <button class="swap-btn" id="sbSwap">⇄</button> <span id="sbRightName"></span></div>
-        <button class="close-x" id="sbClose">×</button>
+        <div class="names" id="sbNames">
+          <span id="sbLeftName"></span>
+          <button class="swap-btn" id="sbSwap">⇄</button>
+          <span id="sbRightName"></span>
+        </div>
       </div>
+
       <div class="points">
         <div class="point left" id="sbLeftPoint">0</div>
+
         <div class="sets-between" aria-hidden="false">
           <div class="set" id="sbLeftSets">0</div>
           <div class="set-label">セット</div>
           <div class="set" id="sbRightSets">0</div>
         </div>
+
         <div class="point right" id="sbRightPoint">0</div>
       </div>
+
       <div class="controls">
         <button class="ghost" id="sbCommit">確定</button>
-        <button class="ghost" id="sbApplyClose">×</button>
+        <button class="ghost" id="sbApplyClose">リセット</button>
       </div>
+
     </div>
+  </div>
+  <!-- 回転するスコアボード本体の外に置き、オーバーレイ右下へ固定します。 -->
+  <button class="close-x" id="sbClose">×</button>
   </div>
 </div>
 <script>
 const S={
   phase:'setup',
+  matchId:'',
   tables:2,
   setsCount:5,
   players:['',''],
@@ -179,9 +379,26 @@ const S={
 
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
 
-function saveState(){localStorage.setItem('tableLeagueState',JSON.stringify(S));}
-function loadState(){const saved=localStorage.getItem('tableLeagueState');if(saved){try{const loaded=JSON.parse(saved);Object.assign(S,loaded);}catch(e){}}}
-function resetState(){S.phase='setup';S.tables=2;S.setsCount=5;S.players=['',''];S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;localStorage.removeItem('tableLeagueState');}
+function matchStorageKey(matchId){return `tableLeagueMatch_${matchId}`;}
+function saveState(){
+  if(!S.matchId)return;
+  localStorage.setItem(matchStorageKey(S.matchId),JSON.stringify(S));
+  localStorage.setItem('tableLeagueLastMatch',S.matchId);
+}
+function loadState(matchId){
+  const id=String(matchId||'').replace(/\D/g,'').slice(0,6);
+  if(!/^\d{6}$/.test(id))return false;
+  const saved=localStorage.getItem(matchStorageKey(id));
+  if(!saved)return false;
+  try{Object.assign(S,JSON.parse(saved));return true;}catch(e){return false;}
+}
+function createMatchId(){
+  let id='';
+  do{id=String(100000+Math.floor(Math.random()*900000));}while(localStorage.getItem(matchStorageKey(id)));
+  return id;
+}
+function getShareUrl(){return `${location.href.split('#')[0]}#match=${S.matchId}`;}
+function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.players=['',''];S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
 
 function buildAllPairs(players){
   const pairs=[];
@@ -196,7 +413,14 @@ function emptySetsList(count=S.setsCount){return Array(count).fill(null).map(()=
 
 function calcSets(sets){
   let w1=0,w2=0;
-  for(const[a,b]of sets){if(a===null||b===null)continue;if(a>b)w1++;else if(b>a)w2++;}
+  for(const[a,b]of sets){
+    const score1=Number(a),score2=Number(b);
+    // どちらも11点未満なら途中セットなので、セット数には加算しません。
+    if(score1<11&&score2<11)continue;
+    // 11点以上になったセットだけ、点数が多い側を1セット加算します。
+    if(score1>score2)w1++;
+    else if(score2>score1)w2++;
+  }
   return{w1,w2};
 }
 
@@ -254,6 +478,14 @@ function startLeague(){
   if(S.players.length<2){
     alert('選手を2名以上入力してください');
     return;
+  }
+  const requestedId=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
+  if(requestedId){
+    if(!/^\d{6}$/.test(requestedId)){alert('試合番号は6桁の数字で入力してください');return;}
+    if(loadState(requestedId)){S.phase='league';S.view='matches';render();return;}
+    S.matchId=requestedId;
+  }else if(!S.matchId){
+    S.matchId=createMatchId();
   }
   S.allPairs=buildAllPairs(S.players);
   S.pendingPairs=[...S.allPairs];
@@ -378,6 +610,14 @@ function render(){
 
 function renderSetup(){
   return`<div class="card">
+  <div class="section-title">試合を共有</div>
+  <div style="color:#888;font-size:16px;line-height:1.6;margin-bottom:14px">新しく始めると6桁の試合番号が発行されます。参加する人は、その番号を入力してください。</div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <input type="text" id="matchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6桁の試合番号" style="flex:1;min-width:220px;letter-spacing:3px">
+    <button class="ghost" id="loadMatch" style="font-size:16px;padding:14px 18px">番号から開く</button>
+  </div>
+</div>
+<div class="card">
   <div class="section-title">基本設定</div>
   <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
     <label style="color:#555;font-size:24px;white-space:nowrap">台の数</label>
@@ -398,7 +638,7 @@ ${S.players.filter(x=>x.trim()).length>=2?'':`<div class="alert">選手を2名�
 }
 
 function renderMain(){
-  const header=`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><div style="display:flex;gap:8px;align-items:center"><button class="ghost" id="backToSetup">設定画面に戻る</button></div></div>`;
+  const header=`<div class="match-id-panel"><div><div class="match-id-label">試合番号</div><div class="match-id-value">${S.matchId}</div></div><button class="ghost" id="shareMatch">共有リンクをコピー</button></div><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><div style="display:flex;gap:8px;align-items:center"><button class="ghost" id="backToSetup">設定画面に戻る</button></div></div>`;
   if(S.view==='history')return header+renderHistory();
   if(S.view==='league')return header+renderLeagueView();
   return header+renderMatches();
@@ -554,10 +794,18 @@ function updateMatchCard(mid){
     if(document.activeElement!==inp){inp.value=(side===0?a:b)!==null?(side===0?a:b):'';}
     inp.disabled=dis;
   });
+  saveState();
 }
 
-// Scoreboard modal state and functions
-const SB={mid:null,left:0,right:0,leftSets:0,rightSets:0};
+// ==================== スコアボードの数字 ====================
+// 試合を開いた直後の左右の得点です。ここを 0 から変えると、試合を開いた直後の大きな数字が変わります。
+const SCOREBOARD_START_POINT=0;
+// 試合を開いた直後の左右のセット数です。ここを 0 から変えると、中央のセット数が変わります。
+const SCOREBOARD_START_SET=0;
+// left/right は左右の大きな得点、leftSets/rightSets は中央のセット数です。
+const SB={mid:null,left:SCOREBOARD_START_POINT,right:SCOREBOARD_START_POINT,leftSets:SCOREBOARD_START_SET,rightSets:SCOREBOARD_START_SET};
+
+// SB の数字を、HTML上の左右の得点と中央のセット数へ反映します。
 function updateScoreboardUI(){
   const ol=document.getElementById('scoreboardOverlay');
   if(!ol) return;
@@ -572,22 +820,33 @@ function updateScoreboardUI(){
 function openScoreboard(mid){
   const m=S.activeMatches.find(x=>x.id===mid);
   if(!m) return alert('試合が見つかりません');
-  SB.mid=mid; SB.leftName=m.p1; SB.rightName=m.p2;
+  SB.mid=mid;
   const sets=S.activeSets[mid]||emptySetsList();
-  const idx=sets.findIndex(s=>s[0]===null&&s[1]===null);
-  const curIdx=idx===-1?0:idx;
-  const cur=sets[curIdx]||[null,null];
-  SB.left=(cur[0]===null?0:cur[0]); SB.right=(cur[1]===null?0:cur[1]);
-  const r=calcSets(sets);
-  SB.leftSets=r.w1; SB.rightSets=r.w2;
+  // 11点以上になったセットは完了。最初の未完了セットを現在のセットにします。
+  const isCompletedSet=([a,b])=>Number(a)>=11||Number(b)>=11;
+  const curIdx=sets.findIndex(set=>!isCompletedSet(set));
+  const completedCount=sets.filter(isCompletedSet).length;
+  // セット確定のたびに左右を入れ替えるため、完了セット数の奇数・偶数で名前を復元します。
+  const swapped=completedCount%2===1;
+  SB.leftName=swapped?m.p2:m.p1;
+  SB.rightName=swapped?m.p1:m.p2;
+  // 途中セットの点数を表示し、未入力なら0-0で開始します。
+  const current=curIdx===-1?[null,null]:sets[curIdx];
+  const p1point=current[0]===null?SCOREBOARD_START_POINT:Number(current[0])||0;
+  const p2point=current[1]===null?SCOREBOARD_START_POINT:Number(current[1])||0;
+  SB.left=swapped?p2point:p1point;
+  SB.right=swapped?p1point:p2point;
+  const r=calcSets(sets.filter(isCompletedSet));
+  SB.leftSets=swapped?r.w2:r.w1;
+  SB.rightSets=swapped?r.w1:r.w2;
   const ol=document.getElementById('scoreboardOverlay');
-  if(ol){ol.style.display='flex';}
+  if(ol){ol.classList.add('is-open');}
   updateScoreboardUI();
 }
 
 function closeScoreboard(){
   const ol=document.getElementById('scoreboardOverlay');
-  if(ol) ol.style.display='none';
+  if(ol) ol.classList.remove('is-open');
   SB.mid=null;
 }
 
@@ -595,8 +854,9 @@ function applyScoreToMatch(commit){
   const mid=SB.mid; if(!mid) return;
   if(!S.activeSets[mid]) S.activeSets[mid]=emptySetsList();
   const sets=S.activeSets[mid];
-  const idx=sets.findIndex(s=>s[0]===null&&s[1]===null);
-  const useIdx=idx===-1?sets.length-1:idx;
+  // 得点板のセット数の合計から書き込み先を決めます。既存の点数があっても、この行を上書きします。
+  const requestedIndex=Number(SB.leftSets)+Number(SB.rightSets);
+  const useIdx=Math.max(0,Math.min(sets.length-1,requestedIndex));
   // Map left/right scoreboard values to match p1/p2 by name (left/right display may swap)
   const m=S.activeMatches.find(x=>x.id===mid);
   if(!m) return;
@@ -607,18 +867,30 @@ function applyScoreToMatch(commit){
   else { // fallback: assume left->p1
     p1score=Number(SB.left)||0; p2score=Number(SB.right)||0;
   }
+  // 今の得点を現在のセットへ保存します。11点未満なら途中経過として残します。
   sets[useIdx]=[p1score,p2score];
-  // update set totals
-  const r=calcSets(sets);
-  SB.leftSets=r.w1; SB.rightSets=r.w2;
-  // if commit (確定): reset points and swap displayed names/sets in modal
-  if(commit){
-    // swap displayed names and sets in modal (visual)
+  const setFinished=p1score>=11||p2score>=11;
+  // 11点以上なら勝者のセット数を1増やし、次のセットを0-0で開始します。
+  if(commit&&setFinished){
+    const leftWasP1=SB.leftName===m.p1;
+    if(p1score>p2score){
+      if(leftWasP1)SB.leftSets++;else SB.rightSets++;
+    }else if(p2score>p1score){
+      if(leftWasP1)SB.rightSets++;else SB.leftSets++;
+    }
+    // セット確定後は、名前とセット数を左右入れ替えます。
     const tmpName=SB.leftName; SB.leftName=SB.rightName; SB.rightName=tmpName;
     const tmpSets=SB.leftSets; SB.leftSets=SB.rightSets; SB.rightSets=tmpSets;
-    SB.left=0; SB.right=0;
+    SB.left=SCOREBOARD_START_POINT; SB.right=SCOREBOARD_START_POINT;
   }
   updateMatchCard(mid);
+  updateScoreboardUI();
+}
+
+function resetScoreboard(){
+  // 対戦表のS.activeSetsや名前には触れず、スコアボード上の得点とセット数だけを戻します。
+  SB.left=SCOREBOARD_START_POINT; SB.right=SCOREBOARD_START_POINT;
+  SB.leftSets=SCOREBOARD_START_SET; SB.rightSets=SCOREBOARD_START_SET;
   updateScoreboardUI();
 }
 
@@ -633,6 +905,19 @@ function attachEvents(){
   if(ap)ap.onclick=()=>{S.players.push('');render();};
   const sl=document.getElementById('startLeague');
   if(sl)sl.onclick=()=>startLeague();
+  const loadMatch=document.getElementById('loadMatch');
+  if(loadMatch)loadMatch.onclick=()=>{
+    const id=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
+    if(!/^\d{6}$/.test(id)){alert('6桁の試合番号を入力してください');return;}
+    if(!loadState(id)){alert('その試合番号はこのブラウザに保存されていません');return;}
+    S.phase='league';S.view='matches';render();
+  };
+  const shareMatch=document.getElementById('shareMatch');
+  if(shareMatch)shareMatch.onclick=async()=>{
+    const url=getShareUrl();
+    try{await navigator.clipboard.writeText(url);alert('共有リンクをコピーしました');}
+    catch(e){prompt('このリンクを共有してください',url);}
+  };
   const back=document.getElementById('backToSetup');
   if(back)back.onclick=()=>{resetState();render();};
   document.querySelectorAll('input[data-mid]').forEach(inp=>{
@@ -684,16 +969,33 @@ function attachEvents(){
   const sbClose=document.getElementById('sbClose');
   const sbCommit=document.getElementById('sbCommit');
   const sbApplyClose=document.getElementById('sbApplyClose');
-  if(sbLeftPoint) sbLeftPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* right 2/3 = +1, left 1/3 = -1 */if(x>rect.width*(1/3)){SB.left=Number(SB.left)+1}else{SB.left=Math.max(0,Number(SB.left)-1)};updateScoreboardUI();};
-  if(sbRightPoint) sbRightPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* right 2/3 = +1, left 1/3 = -1 */if(x>rect.width*(1/3)){SB.right=Number(SB.right)+1}else{SB.right=Math.max(0,Number(SB.right)-1)};updateScoreboardUI();};
+  // 左の黒い得点箱: 右側2/3をクリックすると +1、左側1/3をクリックすると -1 です。
+  if(sbLeftPoint) sbLeftPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* クリック範囲の境界。1/3を変えると増減エリアの広さが変わります。 */if(x>rect.width*(1/3)){SB.left=Number(SB.left)+1}else{SB.left=Math.max(0,Number(SB.left)-1)};updateScoreboardUI();};
+  // 右の黒い得点箱: 右側2/3をクリックすると +1、左側1/3をクリックすると -1 です。
+  if(sbRightPoint) sbRightPoint.onclick=(e)=>{const rect=e.currentTarget.getBoundingClientRect();const x=e.clientX-rect.left;/* クリック範囲の境界。1/3を変えると増減エリアの広さが変わります。 */if(x>rect.width*(1/3)){SB.right=Number(SB.right)+1}else{SB.right=Math.max(0,Number(SB.right)-1)};updateScoreboardUI();};
+  // 中央上のセット数: クリックするたびに左側選手のセット数が +1 されます。
   if(sbLeftSets) sbLeftSets.onclick=()=>{ SB.leftSets=Number(SB.leftSets)+1; updateScoreboardUI(); };
+  // 中央下のセット数: クリックするたびに右側選手のセット数が +1 されます。
   if(sbRightSets) sbRightSets.onclick=()=>{ SB.rightSets=Number(SB.rightSets)+1; updateScoreboardUI(); };
+  // ⇄: 選手名・得点・セット数を左右入れ替えます。
   if(sbSwap) sbSwap.onclick=()=>{ const tmp=SB.leftName; SB.leftName=SB.rightName; SB.rightName=tmp; const t2=SB.left; SB.left=SB.right; SB.right=t2; const t3=SB.leftSets; SB.leftSets=SB.rightSets; SB.rightSets=t3; updateScoreboardUI(); };
+  // ×: スコアボードを閉じます。確定は行いません。
   if(sbClose) sbClose.onclick=()=>{ closeScoreboard(); };
+  // 確定: 現在セットを保存し、次のセットへ進みます。
   if(sbCommit) sbCommit.onclick=()=>{ applyScoreToMatch(true); };
-  if(sbApplyClose) sbApplyClose.onclick=()=>{ applyScoreToMatch(false); closeScoreboard(); S.view='matches'; render(); };
+  // リセット: セット数と得点をすべて0-0に戻して閉じます。
+  if(sbApplyClose) sbApplyClose.onclick=()=>{ resetScoreboard(); };
 }
 
-loadState();
+const hashMatch=(location.hash.match(/^#match=(\d{6})$/)||[])[1];
+if(hashMatch&&loadState(hashMatch)){S.phase='league';S.view='matches';}
+else{
+  const lastMatch=localStorage.getItem('tableLeagueLastMatch');
+  if(lastMatch&&loadState(lastMatch)){S.phase='league';}
+}
+window.addEventListener('storage',event=>{
+  if(event.key!==matchStorageKey(S.matchId)||!event.newValue)return;
+  if(loadState(S.matchId))render();
+});
 render();
 </script>
