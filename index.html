@@ -512,14 +512,19 @@ async function loadRemoteState(matchId){
       data.editingSets = JSON.parse(data.editingSets);
     }
 
-    Object.assign(S,data);
+  Object.assign(S,data);
 
-    localStorage.setItem(
-      matchStorageKey(id),
-      JSON.stringify(S)
-    );
+  localStorage.setItem(
+    matchStorageKey(id),
+    JSON.stringify(S)
+  );
 
-    return true;
+  localStorage.setItem(
+    'tableLeagueLastMatch',
+    id
+  );
+
+  return true;
 
   }catch(error){
     console.error('Firestoreからの読み込みに失敗しました',error);
@@ -527,14 +532,15 @@ async function loadRemoteState(matchId){
     return false;
   }
 }
-async function restoreMatchFromUrl(){
-  const hash = location.hash;
-  const match = hash.match(/^#match=(\d{6})$/);
+async function restoreLastMatch(){
+  const hashMatch=(location.hash.match(/^#match=(\d{6})$/)||[])[1];
+  const id = hashMatch || localStorage.getItem('tableLeagueLastMatch');
 
-  if(!match)return false;
+  if(!/^\d{6}$/.test(id || '')){
+    return false;
+  }
 
-  const id = match[1];
-
+  // まずローカルに保存されているデータを読み込む
   if(loadState(id)){
     S.phase = 'league';
     S.view = 'matches';
@@ -542,12 +548,8 @@ async function restoreMatchFromUrl(){
     return true;
   }
 
+  // ローカルになければFirestoreから読み込む
   if(await loadRemoteState(id)){
-    // Firestoreから取得したactiveSetsを元に戻す
-    if(typeof S.activeSets === 'string'){
-      S.activeSets = JSON.parse(S.activeSets);
-    }
-
     S.phase = 'league';
     S.view = 'matches';
     watchMatch(id);
@@ -1173,21 +1175,12 @@ function attachEvents(){
   if(sbApplyClose) sbApplyClose.onclick=()=>{ resetScoreboard(); };
 }
 
-const hashMatch=(location.hash.match(/^#match=(\d{6})$/)||[])[1];
-async function boot(){
-  if(hashMatch){
-    if(loadState(hashMatch)||await loadRemoteState(hashMatch)){
-      S.phase='league';S.view='matches';watchMatch(hashMatch);
-    }
-  }else{
-    const lastMatch=localStorage.getItem('tableLeagueLastMatch');
-    if(lastMatch&&loadState(lastMatch)){S.phase='league';watchMatch(lastMatch);}
-  }
-  render();
-}
 window.addEventListener('storage',event=>{
   if(event.key!==matchStorageKey(S.matchId)||!event.newValue)return;
   if(loadState(S.matchId))render();
 });
-boot();
+(async()=>{
+  await restoreLastMatch();
+  render();
+})();
 </script>
