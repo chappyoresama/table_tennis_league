@@ -467,6 +467,7 @@ const S={
   tables:2,
   setsCount:5,
   maxMatches:'',
+  tournamentType:'S',
   tournamentTitle:'',
   tournamentDate:'',
   players:['',''],
@@ -614,11 +615,19 @@ async function ensureMemberId(user){
 
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
 function getGuestJoinedMatchIds(){
-  try{return JSON.parse(localStorage.getItem('tableLeagueGuestMatches')||'[]').filter(id=>/^\d{6}$/.test(id));}
-  catch(error){return [];}
+  try{
+    return JSON.parse(
+      localStorage.getItem('tableLeagueGuestMatches')||'[]'
+    ).filter(id=>!!normalizeMatchId(id));
+  }catch(error){
+    return [];
+  }
 }
+
 function rememberGuestMatch(matchId){
-  if(!currentUser?.isAnonymous||!/^\d{6}$/.test(matchId))return;
+  matchId=normalizeMatchId(matchId);
+
+  if(!currentUser?.isAnonymous||!matchId)return;
   const matchIds=new Set(getGuestJoinedMatchIds());
   matchIds.add(matchId);
   localStorage.setItem('tableLeagueGuestMatches',JSON.stringify([...matchIds]));
@@ -958,21 +967,71 @@ delete data.exportVisible;
   return true;
 }
 function loadState(matchId){
-  const id=String(matchId||'').replace(/\D/g,'').slice(0,6);
-  if(!/^\d{6}$/.test(id))return false;
+  const id=normalizeMatchId(matchId);
+if(!id)return false;
   const saved=localStorage.getItem(matchStorageKey(id));
   if(!saved)return false;
   try{Object.assign(S,JSON.parse(saved));return true;}catch(e){return false;}
 }
-function createMatchId(){
-  let id='';
-  do{id=String(100000+Math.floor(Math.random()*900000));}while(id==='990130'||localStorage.getItem(matchStorageKey(id)));
-  return id;
+function normalizeMatchId(value){
+
+  const id = String(value || '').trim().toUpperCase();
+
+  // 新形式
+  if(/^[SWPT]\d{6}$/.test(id)){
+    return id;
+  }
+
+  // 旧形式との互換性
+  if(/^\d{6}$/.test(id)){
+    return id;
+  }
+
+  return '';
+}
+async function createMatchId(type){
+
+  const validTypes = ['S','W','P','T'];
+
+  if(!validTypes.includes(type)){
+    throw new Error('大会種別が正しくありません');
+  }
+
+  for(let attempt=0;attempt<30;attempt++){
+
+    const number = String(
+      100000 + Math.floor(Math.random()*900000)
+    );
+
+    const id = type + number;
+    const matchRef = doc(db,'matches',id);
+
+    // Firestore上で既に使用されていないか確認
+    const created = await runTransaction(db,async transaction=>{
+
+      const snapshot = await transaction.get(matchRef);
+
+      if(snapshot.exists())return false;
+
+      // IDを一時確保する
+      transaction.set(matchRef,{
+        idReserved:true,
+        createdAt:Date.now()
+      });
+
+      return true;
+    });
+
+    if(created)return id;
+  }
+
+  throw new Error('大会IDを発行できませんでした。もう一度お試しください。');
 }
 function getShareUrl(){return `${location.href.split('#')[0]}#match=${S.matchId}`;}
 function setMatchUrl(matchId){location.hash=`match=${matchId}`;rememberGuestMatch(matchId);}
 function watchMatch(matchId){
-  if(!/^\d{6}$/.test(matchId))return;
+  matchId=normalizeMatchId(matchId);
+if(!matchId)return;
   onSnapshot(doc(db,'matches',matchId),snapshot=>{
     if(!snapshot.exists())return;
     const data=snapshot.data();
@@ -1021,8 +1080,8 @@ try{
   },error=>console.error('Firestoreの監視に失敗しました',error));
 }
 async function loadRemoteState(matchId){
-  const id=String(matchId||'').replace(/\D/g,'').slice(0,6);
-  if(!/^\d{6}$/.test(id))return false;
+  const id=normalizeMatchId(matchId);
+if(!id)return false;
 
   try{
     const snapshot=await getDoc(doc(db,'matches',id));
@@ -1071,7 +1130,9 @@ S.exportVisible=localExportVisible;
   }
 }
 async function restoreSharedMatch(){
-  const hashMatch=(location.hash.match(/^#match=(\d{6})$/)||[])[1];
+  const hashMatch=normalizeMatchId(
+  (location.hash.match(/^#match=([^&]+)$/i)||[])[1]
+);
   if(!hashMatch)return false;
   if(!(await loadRemoteState(hashMatch))&&!loadState(hashMatch))return false;
   S.phase='league';
@@ -1079,13 +1140,17 @@ async function restoreSharedMatch(){
   watchMatch(hashMatch);
   return true;
 }
-function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.maxMatches='';S.tournamentTitle='';S.tournamentDate='';S.players=['',''];S.playerRatings=[];S.playerIds=[];S.playerInitialRatings={};S.participantUids=[];S.tournamentClosed=false;S.matchFormat='random';S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
+function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.maxMatches='';S.tournamentTitle='';S.tournamentType='S';S.tournamentDate='';S.players=['',''];S.playerRatings=[];S.playerIds=[];S.playerInitialRatings={};S.participantUids=[];S.tournamentClosed=false;S.matchFormat='random';S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
 
 async function loadAdminMatch(){
   if(!adminUser){alert('管理者アカウントでログインしてください');return;}
   const input=document.getElementById('adminMatchIdInput');
-  const id=(input?.value||'').replace(/\D/g,'');
-  if(!/^\d{6}$/.test(id)){alert('6桁の試合番号を入力してください');return;}
+ const id=normalizeMatchId(input?.value);
+
+if(!id){
+  alert('大会IDを正しく入力してください');
+  return;
+}
   if(!loadState(id)&&!(await loadRemoteState(id))){alert('その試合番号の試合が見つかりません。');render();return;}
   setMatchUrl(id);
   watchMatch(id);
@@ -1406,7 +1471,16 @@ const participants=S.players.map((name,index)=>{
       S.playerInitialRatings[uid]=1500;
     }
   }));
-  S.matchId=createMatchId();
+  S.tournamentType =
+  document.getElementById('tournamentType')?.value || 'S';
+
+try{
+  S.matchId = await createMatchId(S.tournamentType);
+}catch(error){
+  console.error('大会ID発行エラー:',error);
+  alert('大会IDを発行できませんでした。\n' + error.message);
+  return;
+}
   S.allPairs=buildAllPairs(S.players);
   S.pendingPairs=[...S.allPairs];
   S.activeMatches=[];S.activeSets={};S.history=[];S.tournamentClosed=false;
@@ -1745,10 +1819,17 @@ function renderMyPage(){
 }
 
 function renderHome(){
-  const sharedMatchId=(location.hash.match(/^#match=(\d{6})$/)||[])[1]||'';
+  const sharedMatchId=normalizeMatchId(
+  (location.hash.match(/^#match=([^&]+)$/i)||[])[1]
+);
   const tournaments=myParticipation.tournaments||[];
   const tournamentContent=myParticipationStatus==='loading'?'<div style="color:#888">参加中の大会を読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">大会を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:tournaments.length?tournaments.map(tournament=>`<div class="history-item"><div style="flex:1"><div style="font-weight:700">${escapeHtml(tournament.title||`大会 ${tournament.matchId}`)}</div><div style="color:#888;font-size:14px;margin-top:5px">${escapeHtml(tournament.date||'開催日未設定')} ・ ${tournament.activeMatches}試合進行中 ・ 未実施 ${tournament.pendingPairs}試合</div></div><button class="ghost" data-open-home-tournament="${escapeHtml(tournament.matchId)}">大会を開く</button></div>`).join(''):'<div style="color:#888">参加中の大会はありません。</div>';
-  return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">試合検索</div><div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="matchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" value="${escapeHtml(sharedMatchId)}" placeholder="6桁の試合番号" style="flex:1;min-width:180px;letter-spacing:3px"><button class="ghost" id="loadMatch">試合を開く</button></div></div><div class="card"><div class="section-title">参加中の大会</div>${tournamentContent}</div>${canOrganize()?`<div class="card"><div class="section-title">試合作成</div><button id="createLeague">試合を作成する</button></div>`:''}`;
+  return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">試合検索</div><div style="display:flex;gap:10px;flex-wrap:wrap">
+    <input type="text" id="matchIdInput"
+  maxlength="7"
+  value="${escapeHtml(sharedMatchId)}"
+  placeholder="大会ID（例：S123456）"
+  style="flex:1;min-width:180px;letter-spacing:2px;text-transform:uppercase"><button class="ghost" id="loadMatch">試合を開く</button></div></div><div class="card"><div class="section-title">参加中の大会</div>${tournamentContent}</div>${canOrganize()?`<div class="card"><div class="section-title">試合作成</div><button id="createLeague">試合を作成する</button></div>`:''}`;
 }
 
 function renderSetup(){
@@ -1762,6 +1843,16 @@ function renderSetup(){
   <div class="section-title">基本設定</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
     <label style="display:grid;gap:6px;color:#555;font-size:15px">大会タイトル<input type="text" id="tournamentTitle" maxlength="60" value="${escapeHtml(S.tournamentTitle||'')}" placeholder="卓球大会"></label>
+    <label style="display:grid;gap:6px;color:#555;font-size:15px">
+  大会種別
+  <select id="tournamentType"
+    style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff">
+    <option value="S" ${S.tournamentType==='S'?'selected':''}>シングルス</option>
+    <option value="W" ${S.tournamentType==='W'?'selected':''}>ダブルス</option>
+    <option value="P" ${S.tournamentType==='P'?'selected':''}>ペアマッチ</option>
+    <option value="T" ${S.tournamentType==='T'?'selected':''}>団体戦</option>
+  </select>
+</label>
     <label style="display:grid;gap:6px;color:#555;font-size:15px">開催日<input type="date" id="tournamentDate" value="${escapeHtml(S.tournamentDate||new Date().toLocaleDateString('sv-SE'))}"></label>
   </div>
   <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
@@ -1797,7 +1888,10 @@ ${S.players.filter(x=>x.trim()).length>=2?'':`<div class="alert">選手を2名�
 
 function renderMain(){
   const accountPanel=`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div>`;
-  const adminSearch=adminUser?`<div class="card"><div class="section-title">管理者画面</div><div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="adminMatchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="試合番号" style="flex:1;min-width:180px"><button id="adminMatchSearch">試合を開く</button></div></div>`:'';
+  const adminSearch=adminUser?`<div class="card"><div class="section-title">管理者画面</div><div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="adminMatchIdInput"
+  maxlength="7"
+  placeholder="大会ID（例：S123456）"
+  style="flex:1;min-width:180px;text-transform:uppercase"><button id="adminMatchSearch">試合を開く</button></div></div>`:'';
   const tableCountControl=canOrganize()?`<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><label for="liveTableCount" style="color:#555;font-size:16px">台数</label><input type="number" id="liveTableCount" min="1" max="10" value="${S.tables}" style="width:110px"></div>`:'';
   const finishButton=S.view==='matches'&&canOrganize()&&!isTournamentFinished(S)?`<button class="finish-tournament-btn" id="finishTournament">全試合終了</button>`:'';
   const header=`${accountPanel}${adminSearch}${tableCountControl}<div class="match-id-panel"><div><div class="match-id-label">試合番号</div><div class="match-id-value">${S.matchId}</div></div><button class="ghost" id="shareMatch">共有リンクをコピー</button></div><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap"><div class="tab-bar"><div class="tab ${S.view==='matches'?'active':''}" data-tab="matches">対戦表</div><div class="tab ${S.view==='history'?'active':''}" data-tab="history">試合結果</div><div class="tab ${S.view==='league'?'active':''}" data-tab="league">リーグ表</div></div><div style="display:flex;gap:8px;align-items:center">${finishButton}<button class="ghost" id="backToSetup">トップページに戻る</button></div></div>`;
@@ -2083,7 +2177,13 @@ if(tournamentTitle){
     S.tournamentTitle=tournamentTitle.value;
   };
 }
+const tournamentType = document.getElementById('tournamentType');
 
+if(tournamentType){
+  tournamentType.onchange = () => {
+    S.tournamentType = tournamentType.value;
+  };
+}
 const tournamentDate=document.getElementById('tournamentDate');
 if(tournamentDate){
   tournamentDate.oninput=()=>{
@@ -2181,13 +2281,28 @@ if(tournamentDate){
   };});
   const loadMatch=document.getElementById('loadMatch');
   if(loadMatch)loadMatch.onclick=async()=>{
-    const id=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
-    if(!/^\d{6}$/.test(id)){alert('6桁の試合番号を入力してください');return;}
-    if(!loadState(id)&&!(await loadRemoteState(id))){alert('その試合番号の試合が見つかりません。作成した端末で試合を開始し、番号を確認してください。');return;}
-    setMatchUrl(id);
-    watchMatch(id);
-    S.phase='league';S.view='matches';render();
-  };
+
+  const id=normalizeMatchId(
+    document.getElementById('matchIdInput')?.value
+  );
+
+  if(!id){
+    alert('大会IDを正しく入力してください。\n例：S123456');
+    return;
+  }
+
+  if(!loadState(id)&&!(await loadRemoteState(id))){
+    alert('その大会IDの大会が見つかりません。');
+    return;
+  }
+
+  setMatchUrl(id);
+  watchMatch(id);
+
+  S.phase='league';
+  S.view='matches';
+  render();
+};
   const shareMatch=document.getElementById('shareMatch');
   if(shareMatch)shareMatch.onclick=async()=>{
     const url=getShareUrl();
