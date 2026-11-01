@@ -717,7 +717,7 @@ async function searchUserProfiles(searchText){
 async function loadMyParticipation(uid){
   myParticipationStatus='loading';
   myParticipationError='';
-  myParticipation={matches:[],tournaments:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:1500,ratingTier:'',initialRating:null,ratingHistory:[]};
+  myParticipation={matches:[],tournaments:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:1000,ratingTier:'',initialRating:null,ratingHistory:[]};
   try{
     const [participantMatches,legacyMatches,profileSnapshot,guestMatches]=await Promise.all([
       getDocs(query(collection(db,'matches'),where('participantUids','array-contains',uid))),
@@ -734,7 +734,7 @@ async function loadMyParticipation(uid){
     const hasProfileRating=Number.isFinite(profileInitialRating);
     const storedCurrentRating=Number(profile.currentRating);
     const hasStoredCurrentRating=Number.isFinite(storedCurrentRating);
-    const participation={matches:[],tournaments:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:1500,ratingTier:profile.ratingTier||'',initialRating:hasProfileRating?profileInitialRating:null,memberId:profile.memberId||'',ratingHistory:[]};
+    const participation={matches:[],tournaments:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:1000,ratingTier:profile.ratingTier||'',initialRating:hasProfileRating?profileInitialRating:null,memberId:profile.memberId||'',ratingHistory:[]};
     const ratedEvents=[];
     matchDocuments.forEach(snapshot=>{
       const data=snapshot.data();
@@ -814,7 +814,7 @@ async function loadMyParticipation(uid){
     ratedEvents.sort((a,b)=>a.ts-b.ts||a.matchId.localeCompare(b.matchId)||a.id.localeCompare(b.id));
     const firstUserEvent=ratedEvents.find(event=>event.p1Uid===uid||event.p2Uid===uid);
     const firstUserInitialRating=firstUserEvent?(firstUserEvent.p1Uid===uid?firstUserEvent.p1InitialRating:firstUserEvent.p2InitialRating):NaN;
-    const startingRating=hasProfileRating?profileInitialRating:Number.isFinite(firstUserInitialRating)?firstUserInitialRating:1500;
+    const startingRating=hasProfileRating?profileInitialRating:Number.isFinite(firstUserInitialRating)?firstUserInitialRating:1000;
     if(firstUserEvent)participation.ratingHistory.push({ts:Math.max(0,firstUserEvent.ts-1),rating:startingRating,change:0,opponent:'',matchId:'',outcome:'初期'});
     const ratings=new Map();
     const playedGames=new Map();
@@ -822,7 +822,7 @@ async function loadMyParticipation(uid){
     const initialRatingFor=(playerUid,event,side)=>{
       if(playerUid===uid&&hasProfileRating)return profileInitialRating;
       const snapshotRating=side==='p1'?event.p1InitialRating:event.p2InitialRating;
-      return Number.isFinite(snapshotRating)?snapshotRating:1500;
+      return Number.isFinite(snapshotRating)?snapshotRating:1000;
     };
     for(const event of ratedEvents){
       const p1Rating=ratings.has(event.p1Uid)?ratings.get(event.p1Uid):initialRatingFor(event.p1Uid,event,'p1');
@@ -862,7 +862,7 @@ const p2Change = p2K*((1-actualP1)-(1-expectedP1));
         });
       }
     }
-    participation.rating=ratings.get(uid)??(hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:Number.isFinite(firstUserInitialRating)?firstUserInitialRating:1500);
+    participation.rating=ratings.get(uid)??(hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:Number.isFinite(firstUserInitialRating)?firstUserInitialRating:1000);
     const tournaments=new Map();
     for(const match of participation.matches){
       let tournament=tournaments.get(match.matchId);
@@ -1185,15 +1185,15 @@ function replaceActivePlayers(matchId){
   if(SB.mid===matchId)closeScoreboard();
   const previousPair=[match.p1,match.p2];
   const previousPairUids=[match.p1Uid||'',match.p2Uid||''];
-  const previousPairInitialRatings=[match.p1InitialRating??1500,match.p2InitialRating??1500];
+  const previousPairInitialRatings=[match.p1InitialRating??1000,match.p2InitialRating??1000];
   markPairHistoryDeleted(...previousPair);
   markPairHistoryDeleted(p1,p2);
   match.p1=p1;
   match.p2=p2;
   match.p1Uid=S.playerIds[S.players.indexOf(p1)]||'';
   match.p2Uid=S.playerIds[S.players.indexOf(p2)]||'';
-  match.p1InitialRating=S.playerInitialRatings[match.p1Uid]??1500;
-  match.p2InitialRating=S.playerInitialRatings[match.p2Uid]??1500;
+  match.p1InitialRating=S.playerInitialRatings[match.p1Uid]??1000;
+  match.p2InitialRating=S.playerInitialRatings[match.p2Uid]??1000;
   S.participantUids=[...new Set(S.playerIds.filter(Boolean))];
   S.activeSets[matchId]=emptySetsList();
   S.pendingPairs=S.pendingPairs.filter(pair=>!((pair.p1===p1&&pair.p2===p2)||(pair.p1===p2&&pair.p2===p1)));
@@ -1218,7 +1218,7 @@ function buildAllPairs(players){
   const pairs=[];
   for(let i=0;i<players.length;i++)
     for(let j=i+1;j<players.length;j++)
-      pairs.push({p1:players[i],p2:players[j],p1Uid:S.playerIds[i]||'',p2Uid:S.playerIds[j]||'',p1InitialRating:S.playerInitialRatings[S.playerIds[i]]??1500,p2InitialRating:S.playerInitialRatings[S.playerIds[j]]??1500});
+      pairs.push({p1:players[i],p2:players[j],p1Uid:S.playerIds[i]||'',p2Uid:S.playerIds[j]||'',p1InitialRating:S.playerInitialRatings[S.playerIds[i]]??1000,p2InitialRating:S.playerInitialRatings[S.playerIds[j]]??1000});
   return shuffle(pairs);
 }
 
@@ -1477,10 +1477,10 @@ const participants=S.players.map((name,index)=>{
     try{
       const profile=await getDoc(doc(db,'users',uid));
       const initialRating=profile.exists()?Number(profile.data().initialRating):NaN;
-      S.playerInitialRatings[uid]=Number.isFinite(initialRating)?initialRating:1500;
+      S.playerInitialRatings[uid]=Number.isFinite(initialRating)?initialRating:1000;
     }catch(error){
       console.error('参加者レートの読み込みに失敗しました',error);
-      S.playerInitialRatings[uid]=1500;
+      S.playerInitialRatings[uid]=1000;
     }
   }));
   S.tournamentType =
@@ -1516,7 +1516,7 @@ function confirmMatch(mid){
   const winCount=getWinCount();
   if(r.w1<winCount&&r.w2<winCount){alert('先に'+winCount+'セット取る必要があります');return;}
   const ti=m.tableIdx;
-  S.history.push({id:mid,p1:m.p1,p2:m.p2,p1Uid:m.p1Uid||'',p2Uid:m.p2Uid||'',p1InitialRating:m.p1InitialRating??1500,p2InitialRating:m.p2InitialRating??1500,sets:sets.map(s=>[...s]),tableLabel:`台${ti+1}`,ts:Date.now()});
+  S.history.push({id:mid,p1:m.p1,p2:m.p2,p1Uid:m.p1Uid||'',p2Uid:m.p2Uid||'',p1InitialRating:m.p1InitialRating??1000,p2InitialRating:m.p2InitialRating??1000,sets:sets.map(s=>[...s]),tableLabel:`台${ti+1}`,ts:Date.now()});
   S.activeMatches=S.activeMatches.filter(x=>x.id!==mid);
   delete S.activeSets[mid];
   if(isTournamentFinished(S)){
@@ -1539,8 +1539,8 @@ async function finishTournamentNow(){
       p2:match.p2,
       p1Uid:match.p1Uid||'',
       p2Uid:match.p2Uid||'',
-      p1InitialRating:match.p1InitialRating??1500,
-      p2InitialRating:match.p2InitialRating??1500,
+      p1InitialRating:match.p1InitialRating??1000,
+      p2InitialRating:match.p2InitialRating??1000,
       sets:sets.map(set=>[...set]),
       tableLabel:`台${match.tableIdx+1}`,
       ts:Date.now(),
