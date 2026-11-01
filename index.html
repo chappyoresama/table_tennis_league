@@ -432,13 +432,13 @@ import {
   const ADMIN_UID = "6ABYfVgp8Eckyj0WlWCzrMY82tR2";
   const ORGANIZER_UID = "gXs8HMiyCuVOJLglAzFGPCJcUL12";
   const RATING_TIERS = [
-    { name:'ビギナー', range:'0～799', initial:400, icon:'🔰' },
-    { name:'ブロンズ', range:'800～999', initial:900, icon:'🥉' },
-    { name:'シルバー', range:'1,000～1,299', initial:1100, icon:'🥈' },
-    { name:'ゴールド', range:'1,300～1,499', initial:1400, icon:'🥇' },
-    { name:'プラチナ', range:'1,500～1,699', initial:1600, icon:'💎' },
+    { name:'ビギナー  ', range:'0～799', initial:400, icon:'🔰' },
+    { name:'ブロンズ  ', range:'800～999', initial:900, icon:'🥉' },
+    { name:'シルバー  ', range:'1,000～1,299', initial:1100, icon:'🥈' },
+    { name:'ゴールド  ', range:'1,300～1,499', initial:1400, icon:'🥇' },
+    { name:'プラチナ  ', range:'1,500～1,699', initial:1600, icon:'💎' },
     { name:'ダイヤモンド', range:'1,700～1,899', initial:1800, icon:'💠' },
-    { name:'マスター', range:'1,900～', initial:1900, icon:'👑' }
+    { name:'マスター  ', range:'1,900～', initial:1900, icon:'👑' }
   ];
 
   const app = initializeApp(firebaseConfig);
@@ -520,27 +520,98 @@ function generateMemberId(){
   crypto.getRandomValues(randomValues);
   return [...randomValues].map(value=>alphabet[value&31]).join('');
 }
+
 async function ensureMemberId(user){
+
   if(!user||user.isAnonymous)return '';
+
   const profileRef=doc(db,'users',user.uid);
+
   return runTransaction(db,async transaction=>{
+
     const profileSnapshot=await transaction.get(profileRef);
-    const existingId=profileSnapshot.exists()?profileSnapshot.data().memberId:'';
-    if(existingId)return existingId;
-    for(let attempt=0;attempt<20;attempt++){
-      const memberId=generateMemberId();
-      const reservationRef=doc(db,'memberCodes',memberId);
+
+    const existingId=profileSnapshot.exists()
+      ? profileSnapshot.data().memberId
+      : '';
+
+    // 既に会員IDがある場合
+    if(existingId){
+
+      const reservationRef=doc(db,'memberCodes',existingId);
       const reservation=await transaction.get(reservationRef);
-      if(reservation.exists())continue;
-      const now=Date.now();
-      const displayName=user.displayName||profileSnapshot.data()?.displayName||'';
-      transaction.set(reservationRef,{uid:user.uid,memberId,createdAt:now});
-      transaction.set(profileRef,{uid:user.uid,memberId,displayName,displayNameLower:displayName.trim().toLowerCase(),updatedAt:now},{merge:true});
-      return memberId;
+
+      // memberCodesに登録がない場合は補完する
+      if(!reservation.exists()){
+
+        transaction.set(reservationRef,{
+          uid:user.uid,
+          memberId:existingId,
+          createdAt:Date.now()
+        });
+
+      }else{
+
+        const reservationData=reservation.data();
+
+        // 別のUIDに割り当てられていたら上書きしない
+        if(reservationData.uid!==user.uid){
+          throw new Error('会員IDの紐づけが一致しません。管理者にお問い合わせください。');
+        }
+
+        // 不足している情報を補完する
+        if(reservationData.memberId!==existingId){
+          transaction.set(reservationRef,{
+            uid:user.uid,
+            memberId:existingId
+          },{merge:true});
+        }
+
+      }
+
+      return existingId;
+
     }
+
+    // 会員IDがない場合は新規発行
+    for(let attempt=0;attempt<20;attempt++){
+
+      const memberId=generateMemberId();
+
+      const reservationRef=doc(db,'memberCodes',memberId);
+
+      const reservation=await transaction.get(reservationRef);
+
+      if(reservation.exists())continue;
+
+      const now=Date.now();
+
+      const displayName=user.displayName||profileSnapshot.data()?.displayName||'';
+
+      transaction.set(reservationRef,{
+        uid:user.uid,
+        memberId,
+        createdAt:now
+      });
+
+      transaction.set(profileRef,{
+        uid:user.uid,
+        memberId,
+        displayName,
+        displayNameLower:displayName.trim().toLowerCase(),
+        updatedAt:now
+      },{merge:true});
+
+      return memberId;
+
+    }
+
     throw new Error('会員IDを発行できませんでした。もう一度お試しください。');
+
   });
+
 }
+
 function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
 function getGuestJoinedMatchIds(){
   try{return JSON.parse(localStorage.getItem('tableLeagueGuestMatches')||'[]').filter(id=>/^\d{6}$/.test(id));}
@@ -1649,7 +1720,9 @@ function renderMyPage(){
   const ratingTierSection=`<form id="ratingTierForm" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><label for="ratingTier" style="display:block;color:#555;font-size:15px;margin-bottom:6px">初期レートの称号</label><select id="ratingTier" required ${ratingTierEditable?'':'disabled'} style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff"><option value="" disabled ${myParticipation.ratingTier?'':'selected'}>称号を選択</option>${RATING_TIERS.map(tier=>`<option value="${tier.name}" ${myParticipation.ratingTier===tier.name?'selected':''}>${tier.name}（${tier.range} / 初期 ${tier.initial}）</option>`).join('')}</select>${ratingLocked?'<div style="color:#888;font-size:13px;margin-top:8px">初期称号設定後は変更できません。</div>':ratingTierEditable?'<button type="submit" style="margin-top:10px">初期レートを設定</button>':'<div style="color:#888;font-size:13px;margin-top:8px">アカウント情報を読み込み中...</div>'}</form>`;
   const passwordSection=canChangePassword?`<form id="passwordForm"><label for="currentPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">現在のパスワード</label><input type="password" id="currentPassword" autocomplete="current-password" required style="margin-bottom:10px"><label for="newPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード</label><input type="password" id="newPassword" autocomplete="new-password" minlength="6" required style="margin-bottom:10px"><label for="confirmPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード（確認）</label><input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required><button type="submit" style="margin-top:12px">パスワードを変更</button></form>`:`<div style="color:#888">このアカウントではパスワード変更を利用できません。</div>`;
   const recordContent=myParticipationStatus==='loading'?'<div style="color:#888">読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">試合記録を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:`<div class="rating-current"><span>現在のレート</span><strong>${Math.round(myParticipation.rating)}</strong></div><div style="color:#888;font-size:13px;margin-bottom:12px">${myParticipation.ratingTier?`${escapeHtml(myParticipation.ratingTier)}・初期レート ${myParticipation.initialRating}`:'初期称号未設定'}</div>${renderRatingChart(myParticipation.ratingHistory)}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0"><div><div style="color:#888;font-size:13px">試合</div><strong>${myParticipation.wins+myParticipation.losses+myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">勝 / 負 / 分</div><strong>${myParticipation.wins} / ${myParticipation.losses} / ${myParticipation.draws}</strong></div></div>${renderMyTournamentRecords()||'<div style="color:#888">参加した大会はまだありません。</div>'}`;
-  return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentUser?.uid||'')}</div><div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div><div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div><form id="accountNameForm"><label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label><input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required><button type="submit" style="margin-top:12px">アカウント名を保存</button></form>${ratingTierSection}</div></details><details class="my-page-section"><summary>試合記録</summary><div class="my-page-body">${recordContent}</div></details><details class="my-page-section">
+  return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">
+  ${escapeHtml(currentMemberId||'発行中')}
+</div><div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div><div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div><form id="accountNameForm"><label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label><input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required><button type="submit" style="margin-top:12px">アカウント名を保存</button></form>${ratingTierSection}</div></details><details class="my-page-section"><summary>試合記録</summary><div class="my-page-body">${recordContent}</div></details><details class="my-page-section">
   <summary>パスワード変更</summary>
   <div class="my-page-body">${passwordSection}</div>
 </details>
