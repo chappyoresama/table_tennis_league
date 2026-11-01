@@ -432,13 +432,13 @@ import {
   const ADMIN_UID = "6ABYfVgp8Eckyj0WlWCzrMY82tR2";
   const ORGANIZER_UID = "gXs8HMiyCuVOJLglAzFGPCJcUL12";
   const RATING_TIERS = [
-    { name:'ビギナー  ', range:'0～799', initial:400, icon:'🔰' },
-    { name:'ブロンズ  ', range:'800～999', initial:900, icon:'🥉' },
-    { name:'シルバー  ', range:'1,000～1,299', initial:1100, icon:'🥈' },
-    { name:'ゴールド  ', range:'1,300～1,499', initial:1400, icon:'🥇' },
-    { name:'プラチナ  ', range:'1,500～1,699', initial:1600, icon:'💎' },
+    { name:'ビギナー', range:'0～799', initial:400, icon:'🔰' },
+    { name:'ブロンズ', range:'800～999', initial:900, icon:'🥉' },
+    { name:'シルバー', range:'1,000～1,299', initial:1100, icon:'🥈' },
+    { name:'ゴールド', range:'1,300～1,499', initial:1400, icon:'🥇' },
+    { name:'プラチナ', range:'1,500～1,699', initial:1600, icon:'💎' },
     { name:'ダイヤモンド', range:'1,700～1,899', initial:1800, icon:'💠' },
-    { name:'マスター  ', range:'1,900～', initial:1900, icon:'👑' }
+    { name:'マスター', range:'1,900～', initial:1900, icon:'👑' }
   ];
 
   const app = initializeApp(firebaseConfig);
@@ -2329,8 +2329,10 @@ if(copyContactUid)copyContactUid.onclick=async()=>{
       await loadMyParticipation(currentUser.uid);
       render();
       alert(`${tier.name}（初期レート ${tier.initial}）を設定しました`);
-    }catch(error){alert(`初期レートを保存できませんでした: ${error.message}`);}
-  };
+}catch(error){
+  console.error('初期レート保存エラー:',error);
+  alert(`初期レートを保存できませんでした\n\nエラーコード: ${error.code}\n詳細: ${error.message}`);
+}  };
   const passwordForm=document.getElementById('passwordForm');
   if(passwordForm)passwordForm.onsubmit=async event=>{
     event.preventDefault();
