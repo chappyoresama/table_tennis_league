@@ -15,6 +15,8 @@
 .creator-link svg{width:18px;height:18px;display:block;fill:currentColor;flex:0 0 auto}
 h1{font-size:70px;font-weight:800;letter-spacing:2px;color:#111;margin-bottom:18px}
 .brand-title{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+.brand-home{width:fit-content;color:inherit;text-decoration:none;cursor:pointer}
+.brand-home:focus-visible{outline:2px solid #e63000;outline-offset:4px}
 .brand-title h1{margin:0}
 .brand-icon{display:block;width:168px;height:168px;flex:0 0 168px;object-fit:cover;border-radius:50%}
 .sub{color:#888;font-size:24px;letter-spacing:2px;text-transform:uppercase;margin-bottom:26px}
@@ -115,6 +117,12 @@ button.admin-player-save{width:auto;min-height:44px;padding:10px 14px;font-size:
   .my-page-section summary{font-size:16px;padding:16px 2px}
 }
 .history-item{display:flex;align-items:flex-start;justify-content:space-between;padding:20px 0;border-bottom:1px solid #eee;gap:16px;flex-wrap:wrap}
+.tournament-record{border-bottom:1px solid #e5e5e5}
+.tournament-record summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 4px;cursor:pointer;list-style:none;font-weight:700}
+.tournament-record summary::-webkit-details-marker{display:none}
+.tournament-record summary::after{content:'+';color:#e63000;font-size:20px;font-weight:400}
+.tournament-record[open] summary::after{content:'−'}
+.tournament-record-body{padding:0 4px 16px;color:#666;font-size:14px}
 .history-item.deleted{opacity:.55;filter:grayscale(1)}
 .history-sets{font-size:18px;color:#888;margin-top:6px;line-height:1.8}
 .empty-slot{border:2px dashed #e0e0e0;border-radius:10px;padding:28px;text-align:center;color:#ccc;font-size:18px}
@@ -352,7 +360,7 @@ button.finish-tournament-btn{width:auto;min-height:44px;padding:10px 14px;font-s
     <span>@ttnktk</span>
   </a>
 </div>
-<div class="brand-title"><img class="brand-icon" src="icon4.png" alt="TakuMatch アイコン"><h1>TakuMatch</h1></div>
+<a class="brand-title brand-home" id="brandHomeLink" href="#home" aria-label="TakuMatchホーム"><img class="brand-icon" src="icon4.png" alt=""><h1>TakuMatch</h1></a>
 <div class="sub">Table Tennis Match System</div>
 <div id="root"></div>
   <!-- スコアボード本体。普段は非表示で、得点板ボタンを押した時だけ表示します。 -->
@@ -444,6 +452,8 @@ const S={
   tables:2,
   setsCount:5,
   maxMatches:'',
+  tournamentTitle:'',
+  tournamentDate:'',
   players:['',''],
   playerRatings:[],
   playerInitialRatings:{},
@@ -662,6 +672,8 @@ async function loadMyParticipation(uid){
           participation.setsLost+=lostSets;
           participation.matches.push({
             matchId:snapshot.id,
+            tournamentTitle:data.tournamentTitle||'',
+            tournamentDate:data.tournamentDate||'',
             tableLabel:result.tableLabel||'',
             opponent:isP1?result.p2:result.p1,
             score:`${wonSets}-${lostSets}`,
@@ -677,6 +689,8 @@ async function loadMyParticipation(uid){
         if(p1Uid!==uid&&p2Uid!==uid)continue;
         participation.matches.push({
           matchId:snapshot.id,
+          tournamentTitle:data.tournamentTitle||'',
+          tournamentDate:data.tournamentDate||'',
           tableLabel:`台${Number(active.tableIdx)+1}`,
           opponent:p1Uid===uid?active.p2:active.p1,
           score:'',
@@ -694,6 +708,8 @@ async function loadMyParticipation(uid){
       if(isParticipant&&!isTournamentFinished(data)){
         participation.tournaments.push({
           matchId:snapshot.id,
+          title:data.tournamentTitle||'',
+          date:data.tournamentDate||'',
           activeMatches:activeMatches.length,
           pendingPairs:pendingPairs.length,
           ts:Number(data.createdAt||data.updatedAt)||0
@@ -744,9 +760,11 @@ async function loadMyParticipation(uid){
     for(const match of participation.matches){
       let tournament=tournaments.get(match.matchId);
       if(!tournament){
-        tournament={matchId:match.matchId,games:0,wins:0,losses:0,draws:0,pending:0,ts:0};
+        tournament={matchId:match.matchId,title:match.tournamentTitle||'',date:match.tournamentDate||'',games:0,wins:0,losses:0,draws:0,pending:0,ts:0};
         tournaments.set(match.matchId,tournament);
       }
+      if(!tournament.title&&match.tournamentTitle)tournament.title=match.tournamentTitle;
+      if(!tournament.date&&match.tournamentDate)tournament.date=match.tournamentDate;
       tournament.ts=Math.max(tournament.ts,match.ts||0);
       if(match.status==='進行中')tournament.pending++;
       else{
@@ -758,7 +776,9 @@ async function loadMyParticipation(uid){
     }
     participation.matches=[...tournaments.values()].map(tournament=>({
       matchId:tournament.matchId,
-      opponent:`大会 ${tournament.matchId}`,
+      tournamentTitle:tournament.title,
+      tournamentDate:tournament.date,
+      opponent:tournament.title||`大会 ${tournament.matchId}`,
       score:`${tournament.games}試合`,
       tableLabel:`${tournament.wins}勝 ${tournament.losses}敗 ${tournament.draws}分`,
       outcome:'tournament',
@@ -938,7 +958,7 @@ async function restoreSharedMatch(){
   watchMatch(hashMatch);
   return true;
 }
-function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.maxMatches='';S.players=['',''];S.playerRatings=[];S.playerIds=[];S.playerInitialRatings={};S.participantUids=[];S.tournamentClosed=false;S.matchFormat='random';S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
+function resetState(){S.phase='setup';S.matchId='';S.tables=2;S.setsCount=5;S.maxMatches='';S.tournamentTitle='';S.tournamentDate='';S.players=['',''];S.playerRatings=[];S.playerIds=[];S.playerInitialRatings={};S.participantUids=[];S.tournamentClosed=false;S.matchFormat='random';S.allPairs=[];S.pendingPairs=[];S.activeMatches=[];S.activeSets={};S.history=[];S.view='matches';S.tableCount=0;S.editingHistory={};S.editingSets={};S.exportVisible=false;}
 
 async function loadAdminMatch(){
   if(!adminUser){alert('管理者アカウントでログインしてください');return;}
@@ -1224,6 +1244,8 @@ async function startLeague(){
   }else{
     S.maxMatches='';
   }
+  S.tournamentTitle=(document.getElementById('tournamentTitle')?.value||'').trim()||'卓球大会';
+  S.tournamentDate=document.getElementById('tournamentDate')?.value||new Date().toLocaleDateString('sv-SE');
   ensurePlayerIds();
   const participants=S.players.map((name,index)=>({name:name.trim(),rating:S.playerRatings[index],uid:S.playerIds[index]||''})).filter(player=>player.name);
   const selectedUserIds=participants.map(player=>player.uid).filter(Boolean);
@@ -1251,14 +1273,7 @@ async function startLeague(){
       S.playerInitialRatings[uid]=1500;
     }
   }));
-  const requestedId=(document.getElementById('matchIdInput')?.value||'').replace(/\D/g,'');
-  if(requestedId){
-    if(!/^\d{6}$/.test(requestedId)){alert('試合番号は6桁の数字で入力してください');return;}
-    if(loadState(requestedId)||await loadRemoteState(requestedId)){setMatchUrl(requestedId);S.phase='league';S.view='matches';watchMatch(requestedId);render();return;}
-    S.matchId=requestedId;
-  }else if(!S.matchId){
-    S.matchId=createMatchId();
-  }
+  S.matchId=createMatchId();
   S.allPairs=buildAllPairs(S.players);
   S.pendingPairs=[...S.allPairs];
   S.activeMatches=[];S.activeSets={};S.history=[];S.tournamentClosed=false;
@@ -1462,20 +1477,52 @@ function renderRatingChart(points){
   return `<svg class="rating-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="試合ごとのレート推移"><title>レート推移</title>${grid}<polyline points="${line}" fill="none" stroke="#e63000" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${marks}<text x="${padding.left}" y="${height-6}" fill="#777" font-size="12">${new Date(points[0].ts).toLocaleDateString('ja-JP')}</text><text x="${width-padding.right}" y="${height-6}" text-anchor="end" fill="#777" font-size="12">${new Date(points[points.length-1].ts).toLocaleDateString('ja-JP')}</text></svg>`;
 }
 
+function renderMyTournamentRecords(){
+  const tournaments=new Map();
+  for(const record of myParticipation.matches){
+    tournaments.set(record.matchId,{
+      matchId:record.matchId,
+      title:record.tournamentTitle||`大会 ${record.matchId}`,
+      date:record.tournamentDate||'',
+      games:record.score||'0試合',
+      results:record.tableLabel||'0勝 0敗 0分',
+      status:record.status||'完了',
+      ts:record.ts||0
+    });
+  }
+  for(const tournament of myParticipation.tournaments){
+    const record=tournaments.get(tournament.matchId)||{
+      matchId:tournament.matchId,
+      title:`大会 ${tournament.matchId}`,
+      date:'',
+      games:'0試合',
+      results:'0勝 0敗 0分',
+      status:'大会進行中',
+      ts:tournament.ts||0
+    };
+    record.title=tournament.title||record.title;
+    record.date=tournament.date||record.date;
+    record.status='大会進行中';
+    record.ts=Math.max(record.ts,tournament.ts||0);
+    tournaments.set(tournament.matchId,record);
+  }
+  return [...tournaments.values()].sort((a,b)=>b.ts-a.ts||a.matchId.localeCompare(b.matchId)).map(tournament=>`<details class="tournament-record"><summary><span>${escapeHtml(tournament.title)}</span><span style="color:#888;font-size:14px">${escapeHtml(tournament.date)}</span></summary><div class="tournament-record-body"><div>${escapeHtml(tournament.games)} ・ ${escapeHtml(tournament.results)} ・ ${escapeHtml(tournament.status)}</div><button class="ghost" data-open-my-match="${escapeHtml(tournament.matchId)}" style="margin-top:10px">大会情報を見る</button></div></details>`).join('');
+}
+
 function renderMyPage(){
   const canChangePassword=currentUser?.providerData?.some(provider=>provider.providerId==='password');
   const ratingLocked=!!(myParticipation.ratingTier||currentUserRatingTier);
   const ratingTierEditable=currentUserProfileReady&&!ratingLocked;
   const ratingTierSection=`<form id="ratingTierForm" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><label for="ratingTier" style="display:block;color:#555;font-size:15px;margin-bottom:6px">初期レートの称号</label><select id="ratingTier" required ${ratingTierEditable?'':'disabled'} style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff"><option value="" disabled ${myParticipation.ratingTier?'':'selected'}>称号を選択</option>${RATING_TIERS.map(tier=>`<option value="${tier.name}" ${myParticipation.ratingTier===tier.name?'selected':''}>${tier.name}（${tier.range} / 初期 ${tier.initial}）</option>`).join('')}</select>${ratingLocked?'<div style="color:#888;font-size:13px;margin-top:8px">初期称号設定後は変更できません。</div>':ratingTierEditable?'<button type="submit" style="margin-top:10px">初期レートを設定</button>':'<div style="color:#888;font-size:13px;margin-top:8px">アカウント情報を読み込み中...</div>'}</form>`;
   const passwordSection=canChangePassword?`<form id="passwordForm"><label for="currentPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">現在のパスワード</label><input type="password" id="currentPassword" autocomplete="current-password" required style="margin-bottom:10px"><label for="newPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード</label><input type="password" id="newPassword" autocomplete="new-password" minlength="6" required style="margin-bottom:10px"><label for="confirmPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード（確認）</label><input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required><button type="submit" style="margin-top:12px">パスワードを変更</button></form>`:`<div style="color:#888">このアカウントではパスワード変更を利用できません。</div>`;
-  const recordContent=myParticipationStatus==='loading'?'<div style="color:#888">読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">試合記録を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:`<div class="rating-current"><span>現在のレート</span><strong>${Math.round(myParticipation.rating)}</strong></div><div style="color:#888;font-size:13px;margin-bottom:12px">${myParticipation.ratingTier?`${escapeHtml(myParticipation.ratingTier)}・初期レート ${myParticipation.initialRating}`:'初期称号未設定'}</div>${renderRatingChart(myParticipation.ratingHistory)}<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:18px 0"><div><div style="color:#888;font-size:13px">試合</div><strong>${myParticipation.wins+myParticipation.losses+myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">勝 / 負 / 分</div><strong>${myParticipation.wins} / ${myParticipation.losses} / ${myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">セット</div><strong>${myParticipation.setsWon}-${myParticipation.setsLost}</strong></div></div>${myParticipation.matches.length?myParticipation.matches.map(match=>`<div class="history-item"><div style="flex:1"><div style="font-weight:700">${escapeHtml(match.opponent||'大会')} <span style="color:#888">${escapeHtml(match.score)}</span></div><div style="color:#888;font-size:14px;margin-top:5px">${escapeHtml(match.tableLabel)} ・ ${escapeHtml(match.status)}</div></div><a href="#match=${encodeURIComponent(match.matchId)}" data-open-my-match="${escapeHtml(match.matchId)}" style="align-self:center;color:#e63000;font-weight:700">大会を開く</a></div>`).join(''):'<div style="color:#888">参加した試合はまだありません。</div>'}`;
+  const recordContent=myParticipationStatus==='loading'?'<div style="color:#888">読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">試合記録を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:`<div class="rating-current"><span>現在のレート</span><strong>${Math.round(myParticipation.rating)}</strong></div><div style="color:#888;font-size:13px;margin-bottom:12px">${myParticipation.ratingTier?`${escapeHtml(myParticipation.ratingTier)}・初期レート ${myParticipation.initialRating}`:'初期称号未設定'}</div>${renderRatingChart(myParticipation.ratingHistory)}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0"><div><div style="color:#888;font-size:13px">試合</div><strong>${myParticipation.wins+myParticipation.losses+myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">勝 / 負 / 分</div><strong>${myParticipation.wins} / ${myParticipation.losses} / ${myParticipation.draws}</strong></div></div>${renderMyTournamentRecords()||'<div style="color:#888">参加した大会はまだありません。</div>'}`;
   return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentUser?.uid||'')}</div><div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div><div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div><form id="accountNameForm"><label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label><input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required><button type="submit" style="margin-top:12px">アカウント名を保存</button></form>${ratingTierSection}</div></details><details class="my-page-section"><summary>試合記録</summary><div class="my-page-body">${recordContent}</div></details><details class="my-page-section"><summary>パスワード変更</summary><div class="my-page-body">${passwordSection}</div></details><button class="ghost" id="myPageBack" style="margin-top:16px">戻る</button></div>`;
 }
 
 function renderHome(){
   const sharedMatchId=(location.hash.match(/^#match=(\d{6})$/)||[])[1]||'';
   const tournaments=myParticipation.tournaments||[];
-  const tournamentContent=myParticipationStatus==='loading'?'<div style="color:#888">参加中の大会を読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">大会を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:tournaments.length?tournaments.map(tournament=>`<div class="history-item"><div style="flex:1"><div style="font-weight:700">大会 ${escapeHtml(tournament.matchId)}</div><div style="color:#888;font-size:14px;margin-top:5px">${tournament.activeMatches}試合進行中 ・ 未実施 ${tournament.pendingPairs}試合</div></div><button class="ghost" data-open-home-tournament="${escapeHtml(tournament.matchId)}">大会を開く</button></div>`).join(''):'<div style="color:#888">参加中の大会はありません。</div>';
+  const tournamentContent=myParticipationStatus==='loading'?'<div style="color:#888">参加中の大会を読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">大会を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:tournaments.length?tournaments.map(tournament=>`<div class="history-item"><div style="flex:1"><div style="font-weight:700">${escapeHtml(tournament.title||`大会 ${tournament.matchId}`)}</div><div style="color:#888;font-size:14px;margin-top:5px">${escapeHtml(tournament.date||'開催日未設定')} ・ ${tournament.activeMatches}試合進行中 ・ 未実施 ${tournament.pendingPairs}試合</div></div><button class="ghost" data-open-home-tournament="${escapeHtml(tournament.matchId)}">大会を開く</button></div>`).join(''):'<div style="color:#888">参加中の大会はありません。</div>';
   return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">試合検索</div><div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="matchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" value="${escapeHtml(sharedMatchId)}" placeholder="6桁の試合番号" style="flex:1;min-width:180px;letter-spacing:3px"><button class="ghost" id="loadMatch">試合を開く</button></div></div><div class="card"><div class="section-title">参加中の大会</div>${tournamentContent}</div>${canOrganize()?`<div class="card"><div class="section-title">試合作成</div><button id="createLeague">試合を作成する</button></div>`:''}`;
 }
 
@@ -1483,18 +1530,15 @@ function renderSetup(){
   ensurePlayerIds();
   if(currentUser?.isAnonymous||!canOrganize()){
     const identity=`${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'')}`;
-    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${identity}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button>${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">試合に参加</div><div style="color:#888;font-size:16px;line-height:1.6;margin-bottom:14px">試合番号を入力して既存の試合に参加してください。</div><div style="display:flex;flex-direction:column;gap:10px"><input type="text" id="matchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6桁の試合番号" style="letter-spacing:3px"><button class="ghost" id="loadMatch">番号から開く</button></div></div>`;
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${identity}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button>${currentUser?.isAnonymous?'':`<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div>`;
   }
-  return`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'ユーザー')}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button><button class="ghost" id="openMyPage">マイページ</button><button class="ghost" id="signOut">ログアウト</button></div></div><div class="card">
-  <div class="section-title">試合を共有</div>
-  <div style="color:#888;font-size:16px;line-height:1.6;margin-bottom:14px">既存の試合に参加する人は、番号を入力してください。新しく開始する場合は画面下部の「試合開始」から作成してください。</div>
-  <div style="display:flex;flex-direction:column;gap:10px;align-items:stretch">
-    <input type="text" id="matchIdInput" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6桁の試合番号" style="letter-spacing:3px">
-    <button class="ghost" id="loadMatch" style="font-size:16px;padding:14px 18px">番号から開く</button>
-  </div>
-</div>
+  return`<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName||currentUser?.email||'ユーザー')}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button><button class="ghost" id="openMyPage">マイページ</button><button class="ghost" id="signOut">ログアウト</button></div></div>
 <div class="card">
   <div class="section-title">基本設定</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
+    <label style="display:grid;gap:6px;color:#555;font-size:15px">大会タイトル<input type="text" id="tournamentTitle" maxlength="60" value="${escapeHtml(S.tournamentTitle||'')}" placeholder="卓球大会"></label>
+    <label style="display:grid;gap:6px;color:#555;font-size:15px">開催日<input type="date" id="tournamentDate" value="${escapeHtml(S.tournamentDate||new Date().toLocaleDateString('sv-SE'))}"></label>
+  </div>
   <div style="display:flex;align-items:center;gap:24px;margin-bottom:16px">
     <label style="color:#555;font-size:24px;white-space:nowrap">台の数</label>
     <input type="number" id="tableCount" value="${S.tables}" min="1" max="10" style="width:100px">
@@ -1791,6 +1835,17 @@ function resetScoreboard(){
 }
 
 function attachEvents(){
+  const brandHomeLink=document.getElementById('brandHomeLink');
+  if(brandHomeLink)brandHomeLink.onclick=async event=>{
+    event.preventDefault();
+    if(!currentUser){S.phase='login';render();return;}
+    history.replaceState(null,'',location.href.split('#')[0]);
+    S.phase='home';
+    myParticipationStatus='loading';
+    render();
+    await loadMyParticipation(currentUser.uid);
+    if(S.phase==='home')render();
+  };
   document.querySelectorAll('[data-tab]').forEach(el=>{el.onclick=()=>{S.view=el.dataset.tab;render();};});
   const tc=document.getElementById('tableCount');
   if(tc)tc.onchange=()=>changeTableCount(tc.value);
