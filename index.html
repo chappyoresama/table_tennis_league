@@ -827,12 +827,24 @@ async function loadMyParticipation(uid){
     for(const event of ratedEvents){
       const p1Rating=ratings.has(event.p1Uid)?ratings.get(event.p1Uid):initialRatingFor(event.p1Uid,event,'p1');
       const p2Rating=ratings.has(event.p2Uid)?ratings.get(event.p2Uid):initialRatingFor(event.p2Uid,event,'p2');
-      const expectedP1=1/(1+10**((p2Rating-p1Rating)/200));
-      const actualP1=event.sets.w1>event.sets.w2?1:event.sets.w1<event.sets.w2?0:0.5;
-      const p1K=kForGames(playedGames.get(event.p1Uid)||0);
-      const p2K=kForGames(playedGames.get(event.p2Uid)||0);
-      const p1Change=p1K*(actualP1-expectedP1);
-      const p2Change=p2K*((1-actualP1)-(1-expectedP1));
+
+const expectedP1 = 1/(1+10**((p2Rating-p1Rating)/300));
+const actualP1 = event.sets.w1>event.sets.w2 ? 1 : event.sets.w1<event.sets.w2 ? 0 : 0.5;
+
+// 試合前の累計試合数
+const p1Games = playedGames.get(event.p1Uid)||0;
+const p2Games = playedGames.get(event.p2Uid)||0;
+
+// K値の設定
+// 自分が5試合未満なら75
+// 自分は5試合以上で、相手が5試合未満なら20
+// 両者とも5試合以上なら40
+const p1K = p1Games < 5 ? 75 : p2Games < 5 ? 20 : 40;
+const p2K = p2Games < 5 ? 75 : p1Games < 5 ? 20 : 40;
+
+const p1Change = p1K*(actualP1-expectedP1);
+const p2Change = p2K*((1-actualP1)-(1-expectedP1));
+
       ratings.set(event.p1Uid,p1Rating+p1Change);
       ratings.set(event.p2Uid,p2Rating+p2Change);
       playedGames.set(event.p1Uid,(playedGames.get(event.p1Uid)||0)+1);
