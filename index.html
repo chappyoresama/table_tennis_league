@@ -639,7 +639,7 @@ async function loadMyParticipation(uid){
     const hasProfileRating=Number.isFinite(profileInitialRating);
     const storedCurrentRating=Number(profile.currentRating);
     const hasStoredCurrentRating=Number.isFinite(storedCurrentRating);
-    const participation={matches:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:1500,ratingTier:profile.ratingTier||'',initialRating:hasProfileRating?profileInitialRating:null,memberId:profile.memberId||'',ratingHistory:[]};
+    const participation={matches:[],tournaments:[],wins:0,losses:0,draws:0,setsWon:0,setsLost:0,rating:hasStoredCurrentRating?storedCurrentRating:hasProfileRating?profileInitialRating:1500,ratingTier:profile.ratingTier||'',initialRating:hasProfileRating?profileInitialRating:null,memberId:profile.memberId||'',ratingHistory:[]};
     const ratedEvents=[];
     matchDocuments.forEach(snapshot=>{
       const data=snapshot.data();
