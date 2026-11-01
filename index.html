@@ -837,6 +837,10 @@ async function saveState(){
   if(!applyingRemoteState){
     try{
       const data = JSON.parse(state);
+      // 画面表示に関する状態は他のブラウザに同期しない
+delete data.phase;
+delete data.view;
+delete data.exportVisible;
 
       // Firestoreではネストした配列を保存できないため、
       // activeSetsだけJSON文字列として保存する
@@ -903,8 +907,31 @@ function watchMatch(matchId){
       if(previousMatch&&(!updatedMatch||previousMatch.p1!==updatedMatch.p1||previousMatch.p2!==updatedMatch.p2))closeScoreboard();
     }
     applyingRemoteState=true;
-    try{Object.assign(S,data);localStorage.setItem(matchStorageKey(matchId),remote);render();}
-    finally{applyingRemoteState=false;}
+
+try{
+  // このブラウザ固有の画面状態を退避
+  const localPhase=S.phase;
+  const localView=S.view;
+  const localExportVisible=S.exportVisible;
+
+  // 試合データだけを同期
+  Object.assign(S,data);
+
+  // 画面状態は元のまま維持
+  S.phase=localPhase;
+  S.view=localView;
+  S.exportVisible=localExportVisible;
+
+  localStorage.setItem(
+    matchStorageKey(matchId),
+    JSON.stringify(S)
+  );
+
+  render();
+
+}finally{
+  applyingRemoteState=false;
+}
   },error=>console.error('Firestoreの監視に失敗しました',error));
 }
 async function loadRemoteState(matchId){
@@ -929,7 +956,15 @@ async function loadRemoteState(matchId){
       data.editingSets = JSON.parse(data.editingSets);
     }
 
-  Object.assign(S,data);
+  const localPhase=S.phase;
+const localView=S.view;
+const localExportVisible=S.exportVisible;
+
+Object.assign(S,data);
+
+S.phase=localPhase;
+S.view=localView;
+S.exportVisible=localExportVisible;
 
   localStorage.setItem(
     matchStorageKey(id),
@@ -1247,7 +1282,19 @@ async function startLeague(){
   S.tournamentTitle=(document.getElementById('tournamentTitle')?.value||'').trim()||'卓球大会';
   S.tournamentDate=document.getElementById('tournamentDate')?.value||new Date().toLocaleDateString('sv-SE');
   ensurePlayerIds();
-  const participants=S.players.map((name,index)=>({name:name.trim(),rating:S.playerRatings[index],uid:S.playerIds[index]||''})).filter(player=>player.name);
+  
+const participants=S.players.map((name,index)=>{
+  const ratingInput=document.querySelector(`[data-rating="${index}"]`);
+
+  return {
+    name:name.trim(),
+    rating:ratingInput
+      ? ratingInput.value
+      : (S.playerRatings[index]??1000),
+    uid:S.playerIds[index]||''
+  };
+}).filter(player=>player.name);
+
   const selectedUserIds=participants.map(player=>player.uid).filter(Boolean);
   if(new Set(selectedUserIds).size!==selectedUserIds.length){alert('同じユーザーを複数の選手枠に指定できません');return;}
   if(S.matchFormat==='ranked'&&participants.some(player=>player.rating===undefined||player.rating===''||!Number.isFinite(Number(player.rating)))){
