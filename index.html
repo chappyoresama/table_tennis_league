@@ -1693,67 +1693,37 @@ function renderAuthGate(){
     </div>
   `;
 }
+
 function renderRatingChart(points){
-  if(!points.length)return '<div style="color:#888;padding:18px 0">レートの推移は、試合が確定すると表示されます。</div>';
+  if(!points || !points.length){
+    return '<div style="color:#888;padding:18px 0">レートの推移は、試合が確定すると表示されます。</div>';
+  }
+
   const width=720,height=240,padding={top:18,right:20,bottom:30,left:48};
   const values=points.map(point=>point.rating);
   const min=Math.floor(Math.min(...values)/50)*50-50;
   const max=Math.ceil(Math.max(...values)/50)*50+50;
   const x=index=>padding.left+(points.length===1?0:index*(width-padding.left-padding.right)/(points.length-1));
   const y=rating=>padding.top+(max-rating)*(height-padding.top-padding.bottom)/(max-min);
+
   const grid=[0,1,2,3].map(index=>{
     const value=max-(max-min)*index/3;
     const gridY=y(value);
     return `<line x1="${padding.left}" y1="${gridY}" x2="${width-padding.right}" y2="${gridY}" stroke="#e5e5e5"/><text x="${padding.left-8}" y="${gridY+4}" text-anchor="end" fill="#777" font-size="12">${Math.round(value)}</text>`;
   }).join('');
+
   const line=points.map((point,index)=>`${x(index)},${y(point.rating)}`).join(' ');
+
   const marks=points.map((point,index)=>`<circle cx="${x(index)}" cy="${y(point.rating)}" r="4" fill="#e63000"><title>${new Date(point.ts).toLocaleDateString('ja-JP')} ${Math.round(point.rating)} (${point.change>=0?'+':''}${point.change.toFixed(1)})</title></circle>`).join('');
-return `<div class="my-page">
-  <details class="my-page-section" open>
-    <summary>アカウント情報</summary>
-    <div class="my-page-body">
-      <div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div>
-      <div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentMemberId||'発行中')}</div>
 
-      <div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div>
-      <div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div>
-
-      <form id="accountNameForm">
-        <label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label>
-        <input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required>
-        <button type="submit" style="margin-top:12px">アカウント名を保存</button>
-      </form>
-
-      ${ratingTierSection}
-    </div>
-  </details>
-
-  <details class="my-page-section">
-    <summary>試合記録</summary>
-    <div class="my-page-body">${recordContent}</div>
-  </details>
-
-  <details class="my-page-section">
-    <summary>パスワード変更</summary>
-    <div class="my-page-body">${passwordSection}</div>
-  </details>
-
-  <details class="my-page-section">
-    <summary>お問い合わせ</summary>
-    <div class="my-page-body">
-      <p style="color:#666;font-size:14px;line-height:1.7;margin-bottom:12px">
-        不具合やご質問などのお問い合わせの際は、以下のUIDをお知らせください。
-      </p>
-      <div style="background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:12px">
-        <div style="color:#888;font-size:13px;margin-bottom:6px">問い合わせ用UID</div>
-        <div style="font-size:14px;overflow-wrap:anywhere;word-break:break-all">${escapeHtml(currentUser?.uid||'')}</div>
-      </div>
-      <button class="ghost" id="copyContactUid" style="width:100%">UIDをコピー</button>
-    </div>
-  </details>
-
-  <button class="ghost" id="myPageBack" style="margin-top:16px">戻る</button>
-</div>`;}
+  return `<div style="width:100%;overflow-x:auto">
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;min-width:320px;height:auto" role="img" aria-label="レート推移グラフ">
+      ${grid}
+      <polyline points="${line}" fill="none" stroke="#e63000" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${marks}
+    </svg>
+  </div>`;
+}
 
 function renderMyTournamentRecords(){
   const tournaments=new Map();
