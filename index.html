@@ -403,8 +403,23 @@ button.finish-tournament-btn{width:auto;min-height:44px;padding:10px 14px;font-s
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
   import { collection, getDocs, getFirestore, doc, setDoc, getDoc, limit, onSnapshot, query, runTransaction, where } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-  import { createUserWithEmailAndPassword, EmailAuthProvider, getAuth, getIdTokenResult, onAuthStateChanged, reauthenticateWithCredential, sendEmailVerification, signInAnonymously, signInWithEmailAndPassword, signOut, updatePassword, updateProfile } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-
+import {
+  createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  getAuth,
+  GoogleAuthProvider,
+  getIdTokenResult,
+  linkWithPopup,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  sendEmailVerification,
+  signInAnonymously,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  updatePassword,
+  updateProfile
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
   // Your web app's Firebase configuration
   const firebaseConfig = {
     apiKey: "AIzaSyAGEXTBGqhT6R18kEnwN5Owq_I4HOiTT1s",
@@ -1482,30 +1497,57 @@ function buildExportText(){
 function render(){
   const root=document.getElementById('root');
   root.innerHTML=S.phase==='login'?renderAuthGate():S.phase==='mypage'?renderMyPage():S.phase==='home'?renderHome():S.phase==='setup'?renderSetup():renderMain();
-  if(S.phase==='mypage'){
-    const accountBody=root.querySelector('.my-page-section .my-page-body');
-    const uidLabel=accountBody?.firstElementChild;
-    if(uidLabel?.textContent==='会員ID'){
-      const memberIdLabel=document.createElement('div');
-      memberIdLabel.style.cssText='color:#555;font-size:15px;margin-bottom:6px';
-      memberIdLabel.textContent='会員ID';
-      const memberIdValue=document.createElement('div');
-      memberIdValue.style.cssText='font-size:14px;overflow-wrap:anywhere;margin-bottom:16px';
-      memberIdValue.textContent=currentMemberId||'発行中';
-      accountBody.insertBefore(memberIdValue,uidLabel);
-      accountBody.insertBefore(memberIdLabel,memberIdValue);
-      uidLabel.textContent='問い合わせ用UID';
-    }
-  }
+
   attachEvents();
   saveState();
 }
 
 function renderAuthGate(){
   const registering=authFormMode==='register';
-  return `<div class="card" style="max-width:560px;margin:0 auto"><div class="section-title">${registering?'アカウント登録':'ログイン'}</div><form id="authForm"><input type="email" id="authEmail" autocomplete="email" placeholder="メールアドレス" required style="margin-bottom:10px"><input type="password" id="authPassword" autocomplete="${registering?'new-password':'current-password'}" minlength="6" placeholder="パスワード（6文字以上）" required style="margin-bottom:10px"><button type="submit" style="width:100%">${registering?'アカウントを作成':'ログイン'}</button></form><button class="ghost" id="toggleAuthMode" style="width:100%;margin-top:10px">${registering?'ログインはこちら':'新規登録はこちら'}</button><div style="text-align:center;color:#888;margin:18px 0">または</div><button class="ghost" id="guestEntry" style="width:100%">ゲストとして参加</button></div>`;
-}
 
+  return `
+    <div class="card" style="max-width:560px;margin:0 auto">
+      <div class="section-title">
+        ${registering?'アカウント登録':'ログイン'}
+      </div>
+
+      <form id="authForm">
+        <input type="email" id="authEmail"
+          autocomplete="email"
+          placeholder="メールアドレス"
+          required style="margin-bottom:10px">
+
+        <input type="password" id="authPassword"
+          autocomplete="${registering?'new-password':'current-password'}"
+          minlength="6"
+          placeholder="パスワード（6文字以上）"
+          required style="margin-bottom:10px">
+
+        <button type="submit" style="width:100%">
+          ${registering?'アカウントを作成':'ログイン'}
+        </button>
+      </form>
+
+      <button class="ghost" id="toggleAuthMode"
+        style="width:100%;margin-top:10px">
+        ${registering?'ログインはこちら':'新規登録はこちら'}
+      </button>
+
+      <div style="text-align:center;color:#888;margin:18px 0">
+        または
+      </div>
+
+      <button class="ghost" id="googleSignIn"
+        style="width:100%;margin-bottom:10px">
+        Googleでログイン／登録
+      </button>
+
+      <button class="ghost" id="guestEntry" style="width:100%">
+        ゲストとして参加
+      </button>
+    </div>
+  `;
+}
 function renderRatingChart(points){
   if(!points.length)return '<div style="color:#888;padding:18px 0">レートの推移は、試合が確定すると表示されます。</div>';
   const width=720,height=240,padding={top:18,right:20,bottom:30,left:48};
@@ -1521,8 +1563,52 @@ function renderRatingChart(points){
   }).join('');
   const line=points.map((point,index)=>`${x(index)},${y(point.rating)}`).join(' ');
   const marks=points.map((point,index)=>`<circle cx="${x(index)}" cy="${y(point.rating)}" r="4" fill="#e63000"><title>${new Date(point.ts).toLocaleDateString('ja-JP')} ${Math.round(point.rating)} (${point.change>=0?'+':''}${point.change.toFixed(1)})</title></circle>`).join('');
-  return `<svg class="rating-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="試合ごとのレート推移"><title>レート推移</title>${grid}<polyline points="${line}" fill="none" stroke="#e63000" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>${marks}<text x="${padding.left}" y="${height-6}" fill="#777" font-size="12">${new Date(points[0].ts).toLocaleDateString('ja-JP')}</text><text x="${width-padding.right}" y="${height-6}" text-anchor="end" fill="#777" font-size="12">${new Date(points[points.length-1].ts).toLocaleDateString('ja-JP')}</text></svg>`;
-}
+return `<div class="my-page">
+  <details class="my-page-section" open>
+    <summary>アカウント情報</summary>
+    <div class="my-page-body">
+      <div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div>
+      <div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentMemberId||'発行中')}</div>
+
+      <div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div>
+      <div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div>
+
+      <form id="accountNameForm">
+        <label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label>
+        <input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required>
+        <button type="submit" style="margin-top:12px">アカウント名を保存</button>
+      </form>
+
+      ${ratingTierSection}
+    </div>
+  </details>
+
+  <details class="my-page-section">
+    <summary>試合記録</summary>
+    <div class="my-page-body">${recordContent}</div>
+  </details>
+
+  <details class="my-page-section">
+    <summary>パスワード変更</summary>
+    <div class="my-page-body">${passwordSection}</div>
+  </details>
+
+  <details class="my-page-section">
+    <summary>お問い合わせ</summary>
+    <div class="my-page-body">
+      <p style="color:#666;font-size:14px;line-height:1.7;margin-bottom:12px">
+        不具合やご質問などのお問い合わせの際は、以下のUIDをお知らせください。
+      </p>
+      <div style="background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:12px">
+        <div style="color:#888;font-size:13px;margin-bottom:6px">問い合わせ用UID</div>
+        <div style="font-size:14px;overflow-wrap:anywhere;word-break:break-all">${escapeHtml(currentUser?.uid||'')}</div>
+      </div>
+      <button class="ghost" id="copyContactUid" style="width:100%">UIDをコピー</button>
+    </div>
+  </details>
+
+  <button class="ghost" id="myPageBack" style="margin-top:16px">戻る</button>
+</div>`;}
 
 function renderMyTournamentRecords(){
   const tournaments=new Map();
@@ -1563,7 +1649,26 @@ function renderMyPage(){
   const ratingTierSection=`<form id="ratingTierForm" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><label for="ratingTier" style="display:block;color:#555;font-size:15px;margin-bottom:6px">初期レートの称号</label><select id="ratingTier" required ${ratingTierEditable?'':'disabled'} style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff"><option value="" disabled ${myParticipation.ratingTier?'':'selected'}>称号を選択</option>${RATING_TIERS.map(tier=>`<option value="${tier.name}" ${myParticipation.ratingTier===tier.name?'selected':''}>${tier.name}（${tier.range} / 初期 ${tier.initial}）</option>`).join('')}</select>${ratingLocked?'<div style="color:#888;font-size:13px;margin-top:8px">初期称号設定後は変更できません。</div>':ratingTierEditable?'<button type="submit" style="margin-top:10px">初期レートを設定</button>':'<div style="color:#888;font-size:13px;margin-top:8px">アカウント情報を読み込み中...</div>'}</form>`;
   const passwordSection=canChangePassword?`<form id="passwordForm"><label for="currentPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">現在のパスワード</label><input type="password" id="currentPassword" autocomplete="current-password" required style="margin-bottom:10px"><label for="newPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード</label><input type="password" id="newPassword" autocomplete="new-password" minlength="6" required style="margin-bottom:10px"><label for="confirmPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード（確認）</label><input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required><button type="submit" style="margin-top:12px">パスワードを変更</button></form>`:`<div style="color:#888">このアカウントではパスワード変更を利用できません。</div>`;
   const recordContent=myParticipationStatus==='loading'?'<div style="color:#888">読み込み中...</div>':myParticipationStatus==='error'?`<div style="color:#b22">試合記録を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>`:`<div class="rating-current"><span>現在のレート</span><strong>${Math.round(myParticipation.rating)}</strong></div><div style="color:#888;font-size:13px;margin-bottom:12px">${myParticipation.ratingTier?`${escapeHtml(myParticipation.ratingTier)}・初期レート ${myParticipation.initialRating}`:'初期称号未設定'}</div>${renderRatingChart(myParticipation.ratingHistory)}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0"><div><div style="color:#888;font-size:13px">試合</div><strong>${myParticipation.wins+myParticipation.losses+myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">勝 / 負 / 分</div><strong>${myParticipation.wins} / ${myParticipation.losses} / ${myParticipation.draws}</strong></div></div>${renderMyTournamentRecords()||'<div style="color:#888">参加した大会はまだありません。</div>'}`;
-  return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentUser?.uid||'')}</div><div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div><div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div><form id="accountNameForm"><label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label><input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required><button type="submit" style="margin-top:12px">アカウント名を保存</button></form>${ratingTierSection}</div></details><details class="my-page-section"><summary>試合記録</summary><div class="my-page-body">${recordContent}</div></details><details class="my-page-section"><summary>パスワード変更</summary><div class="my-page-body">${passwordSection}</div></details><button class="ghost" id="myPageBack" style="margin-top:16px">戻る</button></div>`;
+  return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">${escapeHtml(currentUser?.uid||'')}</div><div style="color:#555;font-size:15px;margin-bottom:6px">メールアドレス</div><div style="font-size:17px;margin-bottom:16px">${escapeHtml(currentUser?.email||'未設定')}</div><form id="accountNameForm"><label for="accountName" style="display:block;color:#555;font-size:15px;margin-bottom:6px">アカウント名</label><input type="text" id="accountName" maxlength="40" value="${escapeHtml(currentUser?.displayName||'')}" placeholder="アカウント名" required><button type="submit" style="margin-top:12px">アカウント名を保存</button></form>${ratingTierSection}</div></details><details class="my-page-section"><summary>試合記録</summary><div class="my-page-body">${recordContent}</div></details><details class="my-page-section">
+  <summary>パスワード変更</summary>
+  <div class="my-page-body">${passwordSection}</div>
+</details>
+
+<details class="my-page-section">
+  <summary>お問い合わせ</summary>
+  <div class="my-page-body">
+    <p style="color:#666;font-size:14px;line-height:1.7;margin-bottom:12px">
+      不具合やご質問などのお問い合わせの際は、以下のUIDをお知らせください。
+    </p>
+    <div style="background:#f7f8fa;border:1px solid #eee;border-radius:6px;padding:12px;margin-bottom:12px">
+      <div style="color:#888;font-size:13px;margin-bottom:6px">問い合わせ用UID</div>
+      <div style="font-size:14px;overflow-wrap:anywhere;word-break:break-all">${escapeHtml(currentUser?.uid||'')}</div>
+    </div>
+    <button class="ghost" id="copyContactUid" style="width:100%">UIDをコピー</button>
+  </div>
+</details>
+
+<button class="ghost" id="myPageBack" style="margin-top:16px">戻る</button></div>`;
 }
 
 function renderHome(){
@@ -2047,6 +2152,37 @@ if(tournamentDate){
   };
   const toggleAuthMode=document.getElementById('toggleAuthMode');
   if(toggleAuthMode)toggleAuthMode.onclick=()=>{authFormMode=authFormMode==='login'?'register':'login';render();};
+  // Googleログイン・新規登録
+const googleSignIn=document.getElementById('googleSignIn');
+
+if(googleSignIn)googleSignIn.onclick=async()=>{
+  try{
+    const provider=new GoogleAuthProvider();
+
+    provider.setCustomParameters({
+      prompt:'select_account'
+    });
+
+    await signInWithPopup(auth,provider);
+
+    // 認証後のプロフィール作成・画面遷移は
+    // 既存のonAuthStateChangedに任せる
+
+  }catch(error){
+
+    console.error('Google認証エラー:',error);
+
+    if(error.code==='auth/account-exists-with-different-credential'){
+      alert(
+        'このGoogleアカウントと同じメールアドレスのアカウントが既にあります。\n\n' +
+        '先に既存のメールアドレスとパスワードでログインし、' +
+        'マイページからGoogleアカウントを連携してください。'
+      );
+    }else{
+      alert('Google認証に失敗しました: '+error.message);
+    }
+  }
+};
   const guestEntry=document.getElementById('guestEntry');
   if(guestEntry)guestEntry.onclick=async()=>{
     try{await signInAnonymously(auth);}
@@ -2079,6 +2215,18 @@ if(tournamentDate){
   };});
   const myPageBack=document.getElementById('myPageBack');
   if(myPageBack)myPageBack.onclick=()=>{S.phase=myPageReturnPhase;render();};
+  const copyContactUid=document.getElementById('copyContactUid');
+if(copyContactUid)copyContactUid.onclick=async()=>{
+  const uid=currentUser?.uid;
+  if(!uid)return;
+
+  try{
+    await navigator.clipboard.writeText(uid);
+    copyContactUid.textContent='コピーしました';
+  }catch(error){
+    alert('UIDをコピーできませんでした。手動でコピーしてください。');
+  }
+};
   const accountNameForm=document.getElementById('accountNameForm');
   if(accountNameForm)accountNameForm.onsubmit=async event=>{
     event.preventDefault();
