@@ -1563,7 +1563,7 @@ function renderSetup(){
 <div class="card">
   <div class="section-title">参加者</div>
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><label for="memberTarget" style="color:#555;font-size:15px">選手枠</label><select id="memberTarget" style="min-width:120px;padding:10px;border:1px solid #ccc;border-radius:6px">${S.players.map((player,index)=>`<option value="${index}">選手 ${index+1}</option>`).join('')}</select><input type="search" id="memberSearch" placeholder="アカウント名または会員ID" style="flex:1;min-width:180px"><div id="memberSearchResults" style="flex-basis:100%;display:grid;gap:6px"></div></div>
-  <div id="playerList">${S.players.map((p,i)=>`<div class="player-row ${S.matchFormat==='ranked'?'rated':''}"><input type="text" data-pi="${i}" value="${escapeHtml(p)}" placeholder="選手名 ${i+1}">${S.matchFormat==='ranked'?`<input class="player-rating" type="number" data-rating="${i}" value="${S.playerRatings[i]??''}" placeholder="レート" aria-label="${escapeHtml(p||`選手${i+1}`)}のレート">`:''}<button class="rm" data-rm="${i}">✕</button></div>`).join('')}</div>
+  <div id="playerList">${S.players.map((p,i)=>`<div class="player-row ${S.matchFormat==='ranked'?'rated':''}"><input type="text" data-pi="${i}" value="${escapeHtml(p)}" placeholder="選手名 ${i+1}">${S.matchFormat==='ranked'?`<input class="player-rating" type="number" data-rating="${i}" value="${S.playerRatings[i]??'1000'}" placeholder="レート" aria-label="${escapeHtml(p||`選手${i+1}`)}のレート">`:''}<button class="rm" data-rm="${i}">✕</button></div>`).join('')}</div>
   <button class="ghost" id="addPlayer" style="margin-top:8px">＋ 選手を追加</button>
 </div>
 <div style="text-align:center;margin-top:px"><button id="startLeague" style="padding:14px 100px;font-size:16px;letter-spacing:2px">▶ 試合開始</button></div>
@@ -1851,15 +1851,27 @@ function attachEvents(){
   if(tc)tc.onchange=()=>changeTableCount(tc.value);
   const liveTableCount=document.getElementById('liveTableCount');
   if(liveTableCount)liveTableCount.onchange=()=>changeTableCount(liveTableCount.value);
-  const maxMatchCount=document.getElementById('maxMatchCount');
-  if(maxMatchCount)maxMatchCount.oninput=()=>{S.maxMatches=maxMatchCount.value;};
+// 大会タイトル・開催日を入力するたびに状態へ保存
+const tournamentTitle=document.getElementById('tournamentTitle');
+if(tournamentTitle){
+  tournamentTitle.oninput=()=>{
+    S.tournamentTitle=tournamentTitle.value;
+  };
+}
+
+const tournamentDate=document.getElementById('tournamentDate');
+if(tournamentDate){
+  tournamentDate.oninput=()=>{
+    S.tournamentDate=tournamentDate.value;
+  };
+}
   document.querySelectorAll('input[name=setCount]').forEach(radio=>{radio.onchange=()=>{S.setsCount=parseInt(radio.value)||5;}});
   document.querySelectorAll('input[name=matchFormat]').forEach(radio=>{radio.onchange=()=>{S.matchFormat=radio.value;render();};});
   document.querySelectorAll('[data-pi]').forEach(inp=>{inp.oninput=()=>{const index=parseInt(inp.dataset.pi);S.players[index]=inp.value;ensurePlayerIds();S.playerIds[index]='';};});
   document.querySelectorAll('[data-rating]').forEach(inp=>{inp.oninput=()=>{S.playerRatings[parseInt(inp.dataset.rating)]=inp.value;};});
   document.querySelectorAll('[data-rm]').forEach(btn=>{btn.onclick=()=>{const i=parseInt(btn.dataset.rm);S.players.splice(i,1);S.playerRatings.splice(i,1);S.playerIds.splice(i,1);if(!S.players.length)S.players=[''];render();};});
   const ap=document.getElementById('addPlayer');
-  if(ap)ap.onclick=()=>{S.players.push('');S.playerRatings.push('');S.playerIds.push('');render();};
+  if(ap)ap.onclick=()=>{S.players.push('');S.playerRatings.push('1000');S.playerIds.push('');render();};
   const memberSearch=document.getElementById('memberSearch');
   if(memberSearch)memberSearch.oninput=async()=>{
     const version=++memberSearchVersion;
@@ -1872,14 +1884,50 @@ function attachEvents(){
       const profiles=await searchUserProfiles(term);
       if(version!==memberSearchVersion)return;
       resultsElement.innerHTML=profiles.length?profiles.map(profile=>{const memberName=profile.displayName||`ユーザー-${profile.memberId}`;return `<button type="button" class="ghost" data-select-member="${escapeHtml(profile.uid)}" data-member-name="${escapeHtml(memberName)}" style="width:100%;text-align:left;font-size:15px;padding:10px 12px">${escapeHtml(memberName)} <span style="color:#888">(${escapeHtml(profile.memberId||'ID未発行')})</span></button>`;}).join(''):'<span style="color:#888;font-size:14px">該当するユーザーはいません</span>';
-      resultsElement.querySelectorAll('[data-select-member]').forEach(button=>{button.onclick=()=>{
-        const index=parseInt(document.getElementById('memberTarget')?.value,10);
-        if(!Number.isInteger(index)||index<0||index>=S.players.length)return;
-        ensurePlayerIds();
-        S.players[index]=button.dataset.memberName;
-        S.playerIds[index]=button.dataset.selectMember;
-        render();
-      };});
+      resultsElement.querySelectorAll('[data-select-member]').forEach(button=>{
+  button.onclick=async()=>{
+    const index=parseInt(document.getElementById('memberTarget')?.value,10);
+    if(!Number.isInteger(index)||index<0||index>=S.players.length)return;
+
+    ensurePlayerIds();
+
+    const uid=button.dataset.selectMember;
+
+    S.players[index]=button.dataset.memberName;
+    S.playerIds[index]=uid;
+
+    // 初期値は1000
+    let rating=1000;
+
+    try{
+      const profile=await getDoc(doc(db,'users',uid));
+
+      if(profile.exists()){
+        const data=profile.data();
+
+        // 現在レートを優先
+        const currentRating=Number(data.currentRating);
+        const initialRating=Number(data.initialRating);
+
+        if(data.currentRating!==undefined&&
+           data.currentRating!==null&&
+           Number.isFinite(currentRating)){
+          rating=Math.round(currentRating);
+        }else if(data.initialRating!==undefined&&
+                 data.initialRating!==null&&
+                 Number.isFinite(initialRating)){
+          rating=Math.round(initialRating);
+        }
+      }
+    }catch(error){
+      console.error('参加者レートの取得に失敗しました',error);
+    }
+
+    S.playerRatings[index]=rating;
+
+    render();
+  };
+});
     }catch(error){
       if(version===memberSearchVersion)resultsElement.innerHTML='<span style="color:#b22;font-size:14px">ユーザー検索に失敗しました。Firestoreのルールを確認してください。</span>';
       console.error('ユーザープロフィール検索に失敗しました',error);
