@@ -1717,7 +1717,7 @@
       const hasProfileRating = Number.isFinite(profileInitialRating);
       const storedCurrentRating = Number(profile.currentRating);
       const hasStoredCurrentRating = Number.isFinite(storedCurrentRating);
-      const participation = { matches: [], tournaments: [], wins: 0, losses: 0, draws: 0, setsWon: 0, setsLost: 0, rating: hasStoredCurrentRating ? storedCurrentRating : hasProfileRating ? profileInitialRating : 1000, ratingTier: profile.ratingTier || '', initialRating: hasProfileRating ? profileInitialRating : null, memberId: profile.memberId || '', ratingHistory: [] };
+      const participation = { matches: [], tournaments: [], wins: 0, losses: 0, draws: 0, setsWon: 0, setsLost: 0, rating: hasStoredCurrentRating ? storedCurrentRating : 1000, ratingTier: profile.ratingTier || '', initialRating: hasProfileRating ? profileInitialRating : null, memberId: profile.memberId || '', ratingHistory: [] };
       // 個人のレート履歴を取得
       const ratingEventMap = new Map();
 
@@ -2474,13 +2474,18 @@
         const profile = await getDoc(doc(db, 'users', uid));
         const data = profile.exists() ? profile.data() : {};
 
-        const rating = Number(data.currentRating);
-        const games = Number(data.playedGames);
+const currentRatingValue = data.currentRating;
+const rating = Number(currentRatingValue);
+const games = Number(data.playedGames);
 
-        S.playerCurrentRatings[uid] = Number.isFinite(rating)
-          ? rating
-          : Number(data.initialRating) || 1000;
-
+S.playerCurrentRatings[uid] =
+  currentRatingValue !== undefined &&
+  currentRatingValue !== null &&
+  currentRatingValue !== '' &&
+  Number.isFinite(rating)
+    ? rating
+    : 1000;
+    
         S.playerPlayedGames[uid] = Number.isFinite(games)
           ? games
           : 0;
