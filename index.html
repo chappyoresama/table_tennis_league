@@ -2292,62 +2292,75 @@
     return rp;
   }
 
-  function assignNewMatch(tableIdx) {
-    const busy = busyPlayers();
-    const candidates = getEligiblePendingPairs(busy);
-    if (!candidates.length) return false;
-    if (S.matchFormat === 'ranked') {
-      const pair = selectRankedPair(busy);
-      if (!pair) return false;
-      const index = S.pendingPairs.findIndex(p => (p.p1 === pair.p1 && p.p2 === pair.p2) || (p.p1 === pair.p2 && p.p2 === pair.p1));
-      if (index < 0) return false;
-      const selected = S.pendingPairs.splice(index, 1)[0];
-      const id = `${selected.p1}__${selected.p2}__${Date.now()}__${tableIdx}`;
-      S.activeMatches.push({
-        ...selected,
-        id,
-        tableIdx,
+function assignNewMatch(tableIdx) {
+  const busy = busyPlayers();
+  const candidates = getEligiblePendingPairs(busy);
 
-        p1RatingBefore: S.playerCurrentRatings[selected.p1Uid] ?? 1000,
-        p2RatingBefore: S.playerCurrentRatings[selected.p2Uid] ?? 1000,
+  if (!candidates.length) return false;
 
-        p1PlayedGamesBefore: S.playerPlayedGames[selected.p1Uid] ?? 0,
-        p2PlayedGamesBefore: S.playerPlayedGames[selected.p2Uid] ?? 0
-      }); S.activeSets[id] = emptySetsList();
-      return true;
-    }
+  let selectedPair = null;
+
+  if (S.matchFormat === 'ranked') {
+    // 勝率順で対戦ペアを選択
+    selectedPair = selectRankedPair(busy);
+  } else {
+    // 通常対戦で、最近試合をしていない選手を優先
     const rp = recentlyPlayed();
-    const capException = candidates.some(pair => getPlayerMatchCount(pair.p1) >= getMatchLimit() || getPlayerMatchCount(pair.p2) >= getMatchLimit());
-    let best = null, bestScore = -Infinity;
+    const capException = candidates.some(pair =>
+      getPlayerMatchCount(pair.p1) >= getMatchLimit() ||
+      getPlayerMatchCount(pair.p2) >= getMatchLimit()
+    );
+
+    let bestScore = -Infinity;
     let bestWinDifference = Infinity;
+
     for (const candidate of candidates) {
       const { p1, p2 } = candidate;
       const score = (rp[p1] || 0) + (rp[p2] || 0);
-      const winDifference = Math.abs(getPlayerWinRate(p1) - getPlayerWinRate(p2));
-      if (capException ? (winDifference < bestWinDifference || (winDifference === bestWinDifference && score > bestScore)) : score > bestScore) {
-        bestWinDifference = winDifference; bestScore = score; best = candidate;
+      const winDifference = Math.abs(
+        getPlayerWinRate(p1) - getPlayerWinRate(p2)
+      );
+
+      if (
+        capException
+          ? (
+              winDifference < bestWinDifference ||
+              (winDifference === bestWinDifference && score > bestScore)
+            )
+          : score > bestScore
+      ) {
+        bestWinDifference = winDifference;
+        bestScore = score;
+        selectedPair = candidate;
       }
     }
-    if (best === null) return false;
-    const index = S.pendingPairs.indexOf(best);
-    const pair = S.pendingPairs.splice(index, 1)[0];
-    const id = `${selected.p1}__${selected.p2}__${Date.now()}__${tableIdx}`;
-
-    S.activeMatches.push({
-      ...selected,
-      id,
-      tableIdx,
-
-      p1RatingBefore: S.playerCurrentRatings[selected.p1Uid] ?? 1000,
-      p2RatingBefore: S.playerCurrentRatings[selected.p2Uid] ?? 1000,
-
-      p1PlayedGamesBefore: S.playerPlayedGames[selected.p1Uid] ?? 0,
-      p2PlayedGamesBefore: S.playerPlayedGames[selected.p2Uid] ?? 0
-    });
-
-    S.activeSets[id] = emptySetsList();
-    return true;
   }
+
+  if (!selectedPair) return false;
+
+  // 選択したペアを待機リストから取り出す
+  const index = S.pendingPairs.indexOf(selectedPair);
+  if (index < 0) return false;
+
+  const pair = S.pendingPairs.splice(index, 1)[0];
+
+  const id = `${pair.p1}__${pair.p2}__${Date.now()}__${tableIdx}`;
+
+  // 対戦中リストへの追加はここ1か所だけ
+  S.activeMatches.push({
+    ...pair,
+    id,
+    tableIdx,
+    p1RatingBefore: S.playerCurrentRatings[pair.p1Uid] ?? 1000,
+    p2RatingBefore: S.playerCurrentRatings[pair.p2Uid] ?? 1000,
+    p1PlayedGamesBefore: S.playerPlayedGames[pair.p1Uid] ?? 0,
+    p2PlayedGamesBefore: S.playerPlayedGames[pair.p2Uid] ?? 0
+  });
+
+  S.activeSets[id] = emptySetsList();
+
+  return true;
+}
 
   function selectRankedPair(busy) {
     const stats = {};
@@ -2535,52 +2548,31 @@ S.playerCurrentRatings[uid] =
     const eventId = `${tournamentId}_${encodeURIComponent(matchRecord.id)}`;
     const eventRef = doc(db, 'ratingEvents', eventId);
 
-    const p1Ref = p1Uid ? doc(db, 'users', p1Uid) : null;
-    const p2Ref = p2Uid ? doc(db, 'users', p2Uid) : null;
+const p1Ref = p1Uid ? doc(db, 'users', p1Uid) : null;
+const p2Ref = p2Uid ? doc(db, 'users', p2Uid) : null;
 
-    return await runTransaction(db, async transaction => {
-      // 最初に必要なデータをすべて読み込む
-      const eventSnapshot = await transaction.get(eventRef);
-      const p1Snapshot = p1Ref ? await transaction.get(p1Ref) : null;
-      const p2Snapshot = p2Ref ? await transaction.get(p2Ref) : null;
+return await runTransaction(db, async transaction => {
+  // レート履歴だけを読み込む
+  const eventSnapshot = await transaction.get(eventRef);
 
-      // すでに保存済みなら二重更新しない
-      if (eventSnapshot.exists()) {
-        return eventSnapshot.data();
-      }
+  // すでに保存済みなら二重更新しない
+  if (eventSnapshot.exists()) {
+    return eventSnapshot.data();
+  }
 
-      const numberOr = (value, fallback) =>
-        value !== null &&
-          value !== undefined &&
-          Number.isFinite(Number(value))
-          ? Number(value)
-          : fallback;
+  const numberOr = (value, fallback) =>
+    value !== null &&
+    value !== undefined &&
+    Number.isFinite(Number(value))
+      ? Number(value)
+      : fallback;
 
-      const p1Profile = p1Snapshot?.exists() ? p1Snapshot.data() : {};
-      const p2Profile = p2Snapshot?.exists() ? p2Snapshot.data() : {};
+  // 試合作成時に保存したスナップショットを使用する
+  const p1Before = numberOr(matchRecord.p1RatingBefore, 1000);
+  const p2Before = numberOr(matchRecord.p2RatingBefore, 1000);
 
-      // 更新直前のDBレートを基準にする
-      const p1Before = p1Ref
-        ? numberOr(
-          p1Profile.currentRating,
-          numberOr(p1Profile.initialRating, numberOr(matchRecord.p1RatingBefore, 1000))
-        )
-        : numberOr(matchRecord.p1RatingBefore, 1000);
-
-      const p2Before = p2Ref
-        ? numberOr(
-          p2Profile.currentRating,
-          numberOr(p2Profile.initialRating, numberOr(matchRecord.p2RatingBefore, 1000))
-        )
-        : numberOr(matchRecord.p2RatingBefore, 1000);
-
-      const p1GamesBefore = p1Ref
-        ? numberOr(p1Profile.playedGames, numberOr(matchRecord.p1PlayedGamesBefore, 0))
-        : numberOr(matchRecord.p1PlayedGamesBefore, 0);
-
-      const p2GamesBefore = p2Ref
-        ? numberOr(p2Profile.playedGames, numberOr(matchRecord.p2PlayedGamesBefore, 0))
-        : numberOr(matchRecord.p2PlayedGamesBefore, 0);
+  const p1GamesBefore = numberOr(matchRecord.p1PlayedGamesBefore, 0);
+  const p2GamesBefore = numberOr(matchRecord.p2PlayedGamesBefore, 0);
 
       const p1Change = numberOr(matchRecord.p1RatingChange, 0);
       const p2Change = numberOr(matchRecord.p2RatingChange, 0);
@@ -2960,12 +2952,7 @@ S.playerCurrentRatings[uid] =
     delete S.editingSets[id];
   }
   // 試合結果訂正時にレート変動の差額だけを反映
-  async function updateRatingEventAfterCorrection(
-    matchRecord,
-    tournamentId,
-    newP1Change,
-    newP2Change
-  ) {
+  async function updateRatingEventAfterCorrection(matchRecord,tournamentId,newP1Change,newP2Change) {
     const p1Uid = matchRecord.p1Uid || '';
     const p2Uid = matchRecord.p2Uid || '';
 
