@@ -2116,7 +2116,7 @@
   }
 
   function replaceActivePlayers(matchId) {
-    if (!canOrganize) { alert('主催者アカウントでログインしてください'); return; }
+    if (!canOrganize()) { alert('主催者アカウントでログインしてください'); return; }
     const match = S.activeMatches.find(item => item.id === matchId);
     if (!match) return;
     const p1 = [...document.querySelectorAll('[data-replace-p1]')].find(element => element.dataset.replaceP1 === matchId)?.value;
@@ -3074,7 +3074,7 @@ function startEditHistory(id) {
   }
 
 async function saveHistoryEdit(id) {
-  if (S.tournamentClosed) {
+  if (!canOrganize()) {
     alert('大会終了後は試合結果を修正できません');
     return;
   }
@@ -3441,7 +3441,7 @@ ${S.players.filter(x => x.trim()).length >= 2 ? '' : `<div class="alert">選手�
         <span class="badge live">● LIVE</span>
       </div>
       <div class="players-line">${escapeHtml(m.p1)} <span class="vs">vs</span> ${escapeHtml(m.p2)}</div>
-      ${canOrganize ? `<div class="admin-player-editor"><div class="admin-player-title">対戦選手の変更</div><label class="admin-player-field"><span>選手 1</span><select data-replace-p1="${escapeHtml(m.id)}">${S.players.map(player => `<option value="${escapeHtml(player)}" ${player === m.p1 ? 'selected' : ''}>${escapeHtml(player)}</option>`).join('')}</select></label><span class="admin-player-versus">対</span><label class="admin-player-field"><span>選手 2</span><select data-replace-p2="${escapeHtml(m.id)}">${S.players.map(player => `<option value="${escapeHtml(player)}" ${player === m.p2 ? 'selected' : ''}>${escapeHtml(player)}</option>`).join('')}</select></label><button class="ghost admin-player-save" data-save-replacement="${escapeHtml(m.id)}">選手を保存</button></div>` : ''}
+      ${canOrganize() ? `<div class="admin-player-editor"><div class="admin-player-title">対戦選手の変更</div><label class="admin-player-field"><span>選手 1</span><select data-replace-p1="${escapeHtml(m.id)}">${S.players.map(player => `<option value="${escapeHtml(player)}" ${player === m.p1 ? 'selected' : ''}>${escapeHtml(player)}</option>`).join('')}</select></label><span class="admin-player-versus">対</span><label class="admin-player-field"><span>選手 2</span><select data-replace-p2="${escapeHtml(m.id)}">${S.players.map(player => `<option value="${escapeHtml(player)}" ${player === m.p2 ? 'selected' : ''}>${escapeHtml(player)}</option>`).join('')}</select></label><button class="ghost admin-player-save" data-save-replacement="${escapeHtml(m.id)}">選手を保存</button></div>` : ''}
       <div style="margin-top:10px">
         ${Array(setsCount).fill(0).map((_, i) => {
         const [a, b] = sets[i] || [null, null];
@@ -3499,10 +3499,10 @@ ${S.players.filter(x => x.trim()).length >= 2 ? '' : `<div class="alert">選手�
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;align-items:flex-end">
         <span class="winner-badge">${deleted ? '削除済み' : escapeHtml(winner)}</span>
-${S.tournamentClosed ? '' : deleted ? '' : inEdit
+${!canOrganize() || deleted ? '' : inEdit
   ? `<button class="ghost" data-cancel-history="${escapeHtml(h.id)}">キャンセル</button>`
   : `<button class="ghost" data-edit-history="${escapeHtml(h.id)}">編集</button>`}
-${!S.tournamentClosed && inEdit
+${canOrganize() && inEdit
   ? `<button class="confirm-btn" data-save-history="${escapeHtml(h.id)}">保存</button>`
   : ''}
         </div>
