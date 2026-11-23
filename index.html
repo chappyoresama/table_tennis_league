@@ -1328,7 +1328,7 @@
         <path
           d="M18.9 2h3.3l-7.3 8.3 8.6 11.7h-6.8l-5.3-7-6 7H2.1l7.8-9L1.7 2h7l4.8 6.4L18.9 2Zm-1.2 18h1.8L7.7 3.9h-2L17.7 20Z" />
       </svg>
-      <span>@ttnktk</span>
+      <span>@vitaT_suginami</span>
     </a>
   </div>
   <a class="brand-title brand-home" id="brandHomeLink" href="#home" aria-label="TakuMatchホーム"><img class="brand-icon"
@@ -1410,8 +1410,8 @@
     { name: 'ブロンズ', range: '800～999', initial: 900, icon: '🥉' },
     { name: 'シルバー', range: '1,000～1,299', initial: 1100, icon: '🥈' },
     { name: 'ゴールド', range: '1,300～1,499', initial: 1400, icon: '🥇' },
-    { name: 'プラチナ', range: '1,500～1,699', initial: 1600, icon: '💎' },
-    { name: 'ダイヤモンド', range: '1,700～1,899', initial: 1800, icon: '💠' },
+    { name: 'プラチナ', range: '1,500～1,699', initial: 1600, icon: '💠' },
+    { name: 'ダイヤモンド', range: '1,700～1,899', initial: 1800, icon: '💎' },
     { name: 'マスター', range: '1,900～', initial: 1900, icon: '👑' }
   ];
 
@@ -1478,11 +1478,15 @@
     if (value < 1900) return RATING_TIERS[5];
     return RATING_TIERS[6];
   }
+  function getRankLabel() {
+    const ratingTier = getRatingTierForValue(Number.isFinite(currentUserRating) ? currentUserRating : currentUserInitialRating)
+      || RATING_TIERS.find(tier => tier.name === currentUserRatingTier);
+    return `${ratingTier?.icon || '👤'}${ratingTier?.name || 'ランク未設定'}`;
+  }
   function getRoleLabel() {
-    if (currentUser?.isAnonymous) return '👤ゲスト参加中';
-    if (adminUser) return '🛡️管理者ユーザー';
-    const ratingTier = getRatingTierForValue(Number.isFinite(currentUserRating) ? currentUserRating : currentUserInitialRating) || RATING_TIERS.find(tier => tier.name === currentUserRatingTier);
-    return `${ratingTier?.icon || '👤'}${canOrganize() ? '主催者ユーザー' : '一般ユーザー'}`;
+    if (currentUser?.isAnonymous) return 'ゲスト参加中';
+    if (adminUser) return '管理者ユーザー';
+    return canOrganize() ? '主催者ユーザー' : '一般ユーザー';
   }
   function ensurePlayerIds() {
     if (!Array.isArray(S.playerIds)) S.playerIds = [];
@@ -3186,13 +3190,67 @@
   }
 
   function buildExportText() {
-    const history = getCountedHistory();
-    if (!history.length) return '試合結果がありません';
-    return history.map(h => {
-      const r = calcSets(h.sets);
-      const sets = h.sets.filter(([a, b]) => a !== null && b !== null).map(([a, b]) => `${a}-${b}`).join(', ');
-      return `${h.tableLabel} ${h.p1} vs ${h.p2} ${r.w1}-${r.w2} (${sets})`;
-    }).join('\r\n');
+    const uid = currentUser?.uid || '';
+    if (!uid) return 'ログイン中のユーザーを特定できないため、個人成績を出力できません。';
+
+    ensurePlayerIds();
+    const playerIndex = S.playerIds.findIndex(playerUid => playerUid === uid);
+    if (playerIndex < 0 || !S.players[playerIndex]) {
+      return 'ログイン中のユーザーがこの大会の参加者として特定できないため、個人成績を出力できません。';
+    }
+
+    const playerName = S.players[playerIndex];
+    const userIdForName = name => {
+      const indexes = S.players.reduce((result, player, index) => {
+        if (player === name) result.push(index);
+        return result;
+      }, []);
+      return indexes.length === 1 ? S.playerIds[indexes[0]] || '' : '';
+    };
+    const history = getCountedHistory().filter(h => {
+      const p1Uid = h.p1Uid || userIdForName(h.p1);
+      const p2Uid = h.p2Uid || userIdForName(h.p2);
+      if (p1Uid !== uid && p2Uid !== uid) return false;
+      const result = calcSets(h.sets || []);
+      return result.w1 >= getWinCount() || result.w2 >= getWinCount() || h.closedEarly === true;
+    });
+
+    const league = getLeague();
+    const standing = league.find(row => row.p === playerName);
+    const rankText = standing ? `${league.indexOf(standing) + 1}位` : '順位未確定';
+    let wins = 0, losses = 0, draws = 0;
+    const matches = history.map(h => {
+      const p1Uid = h.p1Uid || userIdForName(h.p1);
+      const isP1 = p1Uid === uid;
+      const result = calcSets(h.sets || []);
+      const mySets = isP1 ? result.w1 : result.w2;
+      const opponentSets = isP1 ? result.w2 : result.w1;
+      const scores = (h.sets || [])
+        .filter(set => Array.isArray(set) && set[0] !== null && set[1] !== null)
+        .map(set => isP1 ? `${set[0]}-${set[1]}` : `${set[1]}-${set[0]}`)
+        .join('、');
+      if (mySets > opponentSets) wins++;
+      else if (mySets < opponentSets) losses++;
+      else draws++;
+      return {
+        mySets,
+        opponentSets,
+        opponent: isP1 ? h.p2 : h.p1,
+        scores
+      };
+    });
+
+    const record = `${wins}勝${losses}敗${draws ? `${draws}分` : ''}`;
+    const matchText = matches.map((match, index) => {
+      const outcome = match.mySets > match.opponentSets ? '〇' : match.mySets < match.opponentSets ? '●' : '△';
+      return `${index + 1}試合目\n${outcome} ${match.mySets}-${match.opponentSets}　${match.opponent}\n（${match.scores}）`;
+    }).join('\n');
+
+    if (!matches.length) {
+      return `${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n最終成績：${rankText}\n戦績：0勝0敗\n\n＜個別試合結果＞\n\n本人の確定した試合結果はありません。`;
+    }
+
+    return `${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n最終成績：${rankText}\n戦績：${record}\n\n＜個別試合結果＞\n\n${matchText}`;
   }
 
   function render() {
@@ -3317,7 +3375,9 @@
     const canChangePassword = currentUser?.providerData?.some(provider => provider.providerId === 'password');
     const ratingLocked = !!(myParticipation.ratingTier || currentUserRatingTier);
     const ratingTierEditable = currentUserProfileReady && !ratingLocked;
-    const ratingTierSection = `<form id="ratingTierForm" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><label for="ratingTier" style="display:block;color:#555;font-size:15px;margin-bottom:6px">初期レートの称号</label><select id="ratingTier" required ${ratingTierEditable ? '' : 'disabled'} style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff"><option value="" disabled ${myParticipation.ratingTier ? '' : 'selected'}>称号を選択</option>${RATING_TIERS.map(tier => `<option value="${tier.name}" ${myParticipation.ratingTier === tier.name ? 'selected' : ''}>${tier.name}（${tier.range} / 初期 ${tier.initial}）</option>`).join('')}</select>${ratingLocked ? '<div style="color:#888;font-size:13px;margin-top:8px">初期称号設定後は変更できません。</div>' : ratingTierEditable ? '<button type="submit" style="margin-top:10px">初期レートを設定</button>' : '<div style="color:#888;font-size:13px;margin-top:8px">アカウント情報を読み込み中...</div>'}</form>`;
+    const ratingTierSection = ratingLocked
+      ? `<div style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><div style="color:#555;font-size:15px;margin-bottom:8px">ランク一覧</div><div style="overflow-x:auto"><table><tr><th>アイコン</th><th>レート帯</th><th style="text-align:left">ランク名</th></tr>${RATING_TIERS.map(tier => `<tr><td>${tier.icon}</td><td>${tier.range}</td><td style="text-align:left">${tier.name}</td></tr>`).join('')}</table></div></div>`
+      : `<form id="ratingTierForm" style="margin-top:20px;padding-top:16px;border-top:1px solid #eee"><label for="ratingTier" style="display:block;color:#555;font-size:15px;margin-bottom:6px">初期レートの称号</label><select id="ratingTier" required ${ratingTierEditable ? '' : 'disabled'} style="width:100%;padding:12px;border:1px solid #ccc;border-radius:6px;background:#fff"><option value="" disabled selected>称号を選択</option>${RATING_TIERS.map(tier => `<option value="${tier.name}">${tier.name}（${tier.range} / 初期 ${tier.initial}）</option>`).join('')}</select>${ratingTierEditable ? '<button type="submit" style="margin-top:10px">初期レートを設定</button>' : '<div style="color:#888;font-size:13px;margin-top:8px">アカウント情報を読み込み中...</div>'}</form>`;
     const passwordSection = canChangePassword ? `<form id="passwordForm"><label for="currentPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">現在のパスワード</label><input type="password" id="currentPassword" autocomplete="current-password" required style="margin-bottom:10px"><label for="newPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード</label><input type="password" id="newPassword" autocomplete="new-password" minlength="6" required style="margin-bottom:10px"><label for="confirmPassword" style="display:block;color:#555;font-size:15px;margin-bottom:6px">新しいパスワード（確認）</label><input type="password" id="confirmPassword" autocomplete="new-password" minlength="6" required><button type="submit" style="margin-top:12px">パスワードを変更</button></form>` : `<div style="color:#888">このアカウントではパスワード変更を利用できません。</div>`;
     const recordContent = myParticipationStatus === 'loading' ? '<div style="color:#888">読み込み中...</div>' : myParticipationStatus === 'error' ? `<div style="color:#b22">試合記録を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>` : `<div class="rating-current"><span>現在のレート</span><strong>${Math.round(myParticipation.rating)}</strong></div><div style="color:#888;font-size:13px;margin-bottom:12px">${myParticipation.ratingTier ? `${escapeHtml(myParticipation.ratingTier)}・初期レート ${myParticipation.initialRating}` : '初期称号未設定'}</div>${renderRatingChart(myParticipation.ratingHistory)}<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:18px 0"><div><div style="color:#888;font-size:13px">試合</div><strong>${myParticipation.wins + myParticipation.losses + myParticipation.draws}</strong></div><div><div style="color:#888;font-size:13px">勝 / 負 / 分</div><strong>${myParticipation.wins} / ${myParticipation.losses} / ${myParticipation.draws}</strong></div></div>${renderMyTournamentRecords() || '<div style="color:#888">参加した大会はまだありません。</div>'}`;
     return `<div class="my-page"><details class="my-page-section" open><summary>アカウント情報</summary><div class="my-page-body"><div style="color:#555;font-size:15px;margin-bottom:6px">会員ID</div><div style="font-size:14px;overflow-wrap:anywhere;margin-bottom:16px">
@@ -3350,7 +3410,7 @@
     );
     const tournaments = myParticipation.tournaments || [];
     const tournamentContent = myParticipationStatus === 'loading' ? '<div style="color:#888">参加中の大会を読み込み中...</div>' : myParticipationStatus === 'error' ? `<div style="color:#b22">大会を読み込めませんでした。</div><code style="display:block;margin-top:8px;overflow-wrap:anywhere">${escapeHtml(myParticipationError)}</code>` : tournaments.length ? tournaments.map(tournament => `<div class="history-item"><div style="flex:1"><div style="font-weight:700">${escapeHtml(tournament.title || `大会 ${tournament.matchId}`)}</div><div style="color:#888;font-size:14px;margin-top:5px">${escapeHtml(tournament.date || '開催日未設定')} ・ ${tournament.activeMatches}試合進行中 ・ 未実施 ${tournament.pendingPairs}試合</div></div><button class="ghost" data-open-home-tournament="${escapeHtml(tournament.matchId)}">大会を開く</button></div>`).join('') : '<div style="color:#888">参加中の大会はありません。</div>';
-    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous ? '' : `<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">大会検索</div><div style="display:flex;gap:10px;flex-wrap:wrap">
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="line-height:1.35">${getRankLabel()}<br>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous ? '' : `<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div><div class="card"><div class="section-title">大会検索</div><div style="display:flex;gap:10px;flex-wrap:wrap">
     <input type="text" id="matchIdInput"
   maxlength="7"
   value="${escapeHtml(sharedMatchId)}"
@@ -3361,10 +3421,10 @@
   function renderSetup() {
     ensurePlayerIds();
     if (currentUser?.isAnonymous || !canOrganize()) {
-      const identity = `${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}`;
+      const identity = `<span style="line-height:1.35">${getRankLabel()}<br>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}</span>`;
       return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${identity}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button>${currentUser?.isAnonymous ? '' : `<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div>`;
     }
-    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || 'ユーザー')}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button><button class="ghost" id="openMyPage">マイページ</button><button class="ghost" id="signOut">ログアウト</button></div></div>
+    return `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="line-height:1.35">${getRankLabel()}<br>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || 'ユーザー')}</span><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="ghost" id="goHome">ホーム</button><button class="ghost" id="openMyPage">マイページ</button><button class="ghost" id="signOut">ログアウト</button></div></div>
 <div class="card">
   <div class="section-title">基本設定</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:16px">
@@ -3413,7 +3473,7 @@ ${S.players.filter(x => x.trim()).length >= 2 ? '' : `<div class="alert">選手�
   }
 
   function renderMain() {
-    const accountPanel = `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous ? '' : `<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div>`;
+    const accountPanel = `<div class="card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span style="line-height:1.35">${getRankLabel()}<br>${getRoleLabel()}：${escapeHtml(currentUser?.displayName || currentUser?.email || '')}</span><div style="display:flex;gap:8px;flex-wrap:wrap">${currentUser?.isAnonymous ? '' : `<button class="ghost" id="openMyPage">マイページ</button>`}<button class="ghost" id="signOut">ログアウト</button></div></div>`;
     const adminSearch = adminUser ? `<div class="card"><div class="section-title">管理者画面</div><div style="display:flex;gap:10px;flex-wrap:wrap"><input type="text" id="adminMatchIdInput"
   maxlength="7"
   placeholder="大会ID（例：S123456）"
@@ -3548,9 +3608,9 @@ ${canOrganize() && !S.tournamentClosed && inEdit
       html += `<tr class="${cls}"><td>${medal || i + 1}</td><td style="text-align:left;font-weight:600">${escapeHtml(r.p)}</td><td style="color:#888">${r.w + r.l + r.d}</td><td style="color:#2a8a2a;font-weight:700">${r.w}</td><td style="color:#cc2200">${r.l}</td><td style="color:#888">${r.d}</td><td>${r.sw}-${r.sl}</td></tr>`;
     });
     html += `</table></div>`;
-    html += `<div class="card"><div class="section-title">テキスト出力</div><button class="ghost" id="exportBtn" style="font-size:18px;padding:12px 18px">試合結果をテキスト出力</button>`;
+    html += `<div class="card"><div class="section-title">試合結果を出力</div><button class="ghost" id="exportBtn" style="font-size:18px;padding:12px 18px">試合結果をテキスト出力</button>`;
     if (S.exportVisible) {
-      html += `<textarea id="exportTextArea" readonly rows="10" style="width:100%;font-size:14px;padding:12px;margin-top:12px;white-space:pre-wrap;resize:vertical">${escapeHtml(exportText)}</textarea><button class="ghost" id="copyExportBtn" style="margin-top:12px;font-size:18px;padding:12px 18px">結果をコピー</button>`;
+      html += `<textarea id="exportTextArea" readonly rows="10" style="width:100%;font-size:14px;padding:12px;margin-top:12px;white-space:pre-wrap;resize:vertical">${escapeHtml(exportText)}</textarea><button class="ghost" id="copyExportBtn" style="margin-top:12px;font-size:18px;padding:12px 18px">結果をコピー</button><button class="ghost" id="postExportToTwitterBtn" style="margin-top:12px;font-size:18px;padding:12px 18px">結果をTwitter（現：X）に投稿</button>`;
     }
     html += `</div>`;
     return html;
@@ -3649,6 +3709,7 @@ ${canOrganize() && !S.tournamentClosed && inEdit
     // Map left/right scoreboard values to match p1/p2 by name (left/right display may swap)
     const m = S.activeMatches.find(x => x.id === mid);
     if (!m) return;
+    if (commit && Number(SB.left) === 0 && Number(SB.right) === 0) return;
     let p1score, p2score;
     // if SB.leftName corresponds to m.p1, left->p1, else left->p2
     if (SB.leftName === m.p1) { p1score = Number(SB.left) || 0; p2score = Number(SB.right) || 0; }
@@ -4014,13 +4075,26 @@ ${canOrganize() && !S.tournamentClosed && inEdit
       button.onclick = () => replaceActivePlayers(button.dataset.saveReplacement);
     });
     document.querySelectorAll('input[data-mid]').forEach(inp => {
+      inp.dataset.previousValue = inp.value;
       inp.oninput = () => {
         const mid = inp.dataset.mid, si = parseInt(inp.dataset.set), side = parseInt(inp.dataset.side);
         const raw = inp.value;
         const sets = ensureMatchSets(mid);
-        if (raw === '') { sets[si][side] = null; updateMatchCard(mid); return; }
+        if (raw === '') {
+          sets[si][side] = null;
+          inp.dataset.previousValue = raw;
+          updateMatchCard(mid);
+          return;
+        }
         const v = parseInt(raw, 10); if (isNaN(v)) return;
-        updateAutomaticOpponentScore(mid, si, side, v);
+        const previousValue = inp.dataset.previousValue || '';
+        const isDeleting = raw.length < previousValue.length;
+        if (isDeleting) {
+          sets[si][side] = v;
+        } else {
+          updateAutomaticOpponentScore(mid, si, side, v);
+        }
+        inp.dataset.previousValue = raw;
         updateMatchCard(mid);
       };
     });
@@ -4049,6 +4123,13 @@ ${canOrganize() && !S.tournamentClosed && inEdit
       if (!ta) return;
       ta.select();
       try { document.execCommand('copy'); alert('テキストをコピーしました'); } catch (e) { alert('コピーに失敗しました'); }
+    };
+    const postExportToTwitterBtn = document.getElementById('postExportToTwitterBtn');
+    if (postExportToTwitterBtn) postExportToTwitterBtn.onclick = () => {
+      const ta = document.getElementById('exportTextArea');
+      if (!ta) return;
+      const tweetUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(ta.value)}`;
+      window.open(tweetUrl, '_blank', 'noopener,noreferrer');
     };
     // Open scoreboard from header button (first active match) or per-table button
     document.querySelectorAll('[data-open-score]').forEach(btn => { btn.onclick = () => openScoreboard(btn.dataset.openScore); });
