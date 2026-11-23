@@ -3247,10 +3247,10 @@
     }).join('\n');
 
     if (!matches.length) {
-      return `${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n最終成績：${rankText}\n戦績：0勝0敗\n\n＜個別試合結果＞\n\n本人の確定した試合結果はありません。`;
+      return `大会はまだ終了していません\n${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n＜個別試合結果＞\n\n確定した試合結果はありません。`;
     }
 
-    return `${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n最終成績：${rankText}\n戦績：${record}\n\n＜個別試合結果＞\n\n${matchText}`;
+    return `TakuMatchで大会参加しました！\n${S.tournamentDate || ''}　${S.tournamentTitle || ''}\n\n大会成績：${rankText}\n戦績：${record}\n\n＜個別試合結果＞\n\n${matchText}`;
   }
 
   function render() {
