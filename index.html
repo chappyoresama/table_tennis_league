@@ -1484,8 +1484,8 @@
     return `${ratingTier?.icon || '👤'}${ratingTier?.name || 'ランク未設定'}`;
   }
   function getRoleLabel() {
-    if (currentUser?.isAnonymous) return 'ゲスト参加中';
-    if (adminUser) return '管理者ユーザー';
+    if (currentUser?.isAnonymous) return '👤ゲスト参加中';
+    if (adminUser) return '🛡️管理者ユーザー';
     return canOrganize() ? '主催者ユーザー' : '一般ユーザー';
   }
   function ensurePlayerIds() {
